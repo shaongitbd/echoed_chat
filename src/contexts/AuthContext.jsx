@@ -1,0 +1,213 @@
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { toast } from 'sonner';
+import * as appwriteService from '../services/appwrite';
+
+// Create context
+const AuthContext = createContext();
+
+// Provider component
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Check if user is logged in on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+  
+  // Function to check authentication status
+  const checkAuth = async () => {
+    console.log('Checking authentication status...');
+    try {
+      setIsLoading(true);
+      
+      // First check if we have an active session
+      console.log('Checking for active session...');
+      const session = await appwriteService.checkSession();
+      console.log('Session check result:', session);
+      
+      if (!session) {
+        console.log('No active session found, setting user to null');
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('Active session found, getting user data');
+      const currentUser = await appwriteService.getCurrentUser();
+      console.log('Current user data:', currentUser);
+      
+      if (currentUser) {
+        console.log('Setting user state with:', currentUser);
+        setUser(currentUser);
+      } else {
+        console.log('No user data found despite active session, setting user to null');
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+      console.log('Auth check complete');
+    }
+  };
+  
+  // Register a new user
+  const register = async (email, password, name) => {
+    setIsLoading(true);
+    
+    try {
+      await appwriteService.createAccount(email, password, name);
+      
+      // Send verification email
+      // Note: This would require additional setup in Appwrite
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Login with email and password
+  const login = async (email, password) => {
+    setIsLoading(true);
+    
+    try {
+      await appwriteService.signIn(email, password);
+      await checkAuth(); // Re-check auth after login
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Login with OAuth provider
+  const loginWithOAuth = async (provider) => {
+    try {
+      // Redirect to OAuth provider
+      // This will redirect the user away from the app
+      await appwriteService.account.createOAuth2Session(provider);
+    } catch (error) {
+      console.error(`${provider} login error:`, error);
+      toast.error(`Failed to login with ${provider}`);
+    }
+  };
+  
+  // Logout
+  const logout = async () => {
+    setIsLoading(true);
+    
+    try {
+      await appwriteService.signOut();
+      setUser(null);
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to logout');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Manually refresh auth state
+  const refreshAuth = async () => {
+    return await checkAuth();
+  };
+  
+  // Update user profile
+  const updateUserProfile = async (data) => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    
+    try {
+      // Update name if provided
+      if (data.name) {
+        await appwriteService.account.updateName(data.name);
+      }
+      
+      // Update password if provided
+      if (data.password) {
+        await appwriteService.account.updatePassword(data.password);
+      }
+      
+      // Update user document in database
+      await appwriteService.databases.updateDocument(
+        appwriteService.DATABASE_ID,
+        appwriteService.USERS_COLLECTION_ID,
+        user.$id,
+        {
+          ...(data.name && { name: data.name }),
+          updatedAt: new Date().toISOString()
+        }
+      );
+      
+      // Refresh user data
+      const updatedUser = await appwriteService.getCurrentUser();
+      setUser(updatedUser);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Update profile error:', error);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Update user preferences
+  const updateUserPreferences = async (preferences) => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    
+    try {
+      await appwriteService.updateUserPreferences(user.$id, preferences);
+      
+      // Refresh user data
+      const updatedUser = await appwriteService.getCurrentUser();
+      setUser(updatedUser);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Update preferences error:', error);
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Context value
+  const value = {
+    user,
+    isLoading,
+    register,
+    login,
+    loginWithOAuth,
+    logout,
+    refreshAuth,
+    updateUserProfile,
+    updateUserPreferences
+  };
+  
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// Custom hook to use the auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  
+  return context;
+}; 
