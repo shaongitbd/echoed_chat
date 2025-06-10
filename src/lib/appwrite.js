@@ -27,6 +27,10 @@ const PROFILE_IMAGES_BUCKET_ID = process.env.REACT_APP_APPWRITE_PROFILE_IMAGES_B
 const CHAT_ATTACHMENTS_BUCKET_ID = process.env.REACT_APP_APPWRITE_CHAT_ATTACHMENTS_BUCKET_ID || 'chat-attachments';
 const GENERATED_CONTENT_BUCKET_ID = process.env.REACT_APP_APPWRITE_GENERATED_CONTENT_BUCKET_ID || 'generated-content';
 
+// A placeholder for your attachments bucket ID.
+// IMPORTANT: Make sure to set this in your .env file.
+const attachmentsBucketId = process.env.REACT_APP_APPWRITE_ATTACHMENTS_BUCKET_ID;
+
 // Service class to handle all Appwrite operations
 class AppwriteService {
   // Authentication methods
@@ -461,7 +465,7 @@ class AppwriteService {
         contentType = 'text',
         model = '',
         provider = '',
-        fileIds = [],
+        attachments = [],
         parentMessageId = '',
         searchMetadata = null,
         contextLength = 0,
@@ -479,7 +483,7 @@ class AppwriteService {
           contentType,
           model,
           provider,
-          fileIds,
+          attachments,
           parentMessageId: parentMessageId || null,
           isEdited: false,
           searchMetadata,
@@ -596,37 +600,23 @@ class AppwriteService {
   }
 
   // File methods
-  async uploadFile(file, bucketId, userId, metadata = {}) {
+  async uploadFile(file) {
+    if (!attachmentsBucketId) {
+      throw new Error('Appwrite attachments bucket ID is not configured. Please set REACT_APP_APPWRITE_ATTACHMENTS_BUCKET_ID in your .env file.');
+    }
     try {
-      const { threadId, messageId } = metadata;
+      const response = await storage.createFile(attachmentsBucketId, ID.unique(), file);
+      const fileUrl = storage.getFileView(response.bucketId, response.$id);
       
-      // Upload file to storage
-      const storageFile = await storage.createFile(
-        bucketId,
-        ID.unique(),
-        file
-      );
-      
-      // Create file document
-      const fileDoc = await databases.createDocument(
-        DATABASE_ID,
-        FILES_COLLECTION_ID,
-        storageFile.$id,
-        {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          uploadedBy: userId,
-          storageId: storageFile.$id,
-          threadId: threadId || null,
-          messageId: messageId || null,
-          public: false
-        }
-      );
-      
-      return fileDoc;
+      return {
+        name: file.name,
+        contentType: file.type,
+        url: fileUrl.href, // Use the public URL of the file
+        fileId: response.$id,
+        bucketId: response.bucketId,
+      };
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('Error uploading file to Appwrite:', error);
       throw error;
     }
   }

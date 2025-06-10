@@ -42,7 +42,7 @@ export const PROVIDERS = [
       { id: 'gemini-2.5-flash-preview-05-20', name: 'Gemini 2.5 Flash Preview 05-20', description: 'Adaptive thinking, cost efficiency', capabilities: ['text'] },
       { id: 'gemini-2.5-pro-preview-06-05', name: 'Gemini 2.5 Pro Preview', description: 'Enhanced thinking, reasoning, and multimodal understanding', capabilities: ['text', 'audio', 'image', 'video'] },
       { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Next-gen features, speed, and thinking', capabilities: ['text'] },
-      { id: 'gemini-2.0-flash-preview-image-generation', name: 'Gemini 2.0 Flash Preview (Image Generation)', description: 'Conversational image generation and editing', capabilities: ['image'] },
+      { id: 'gemini-2.0-flash-preview-image-generation', name: 'Gemini 2.0 Flash Preview (Image Generation)', description: 'Conversational image generation and editing', capabilities: ['text', 'image'] },
       { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash-Lite', description: 'Cost efficiency and low latency', capabilities: ['text'] },
       { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast and versatile performance', capabilities: ['text'] },
       { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash-8B', description: 'High volume and lower intelligence tasks', capabilities: ['text'] },

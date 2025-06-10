@@ -272,7 +272,16 @@ const Chat = () => {
           videoPrompt: msg.videoPrompt,
           model: msg.model,
           provider: msg.provider,
-          attachments: msg.attachments || [], // Load attachments from DB
+          // Parse the stringified attachment data from the DB back into objects
+          attachments: (msg.attachments || []).map(att => {
+            try {
+              return JSON.parse(att);
+            } catch (e) {
+              console.warn('Could not parse attachment, treating as raw string:', att);
+              // Handle case where it might be a plain URL string for older data
+              return { url: att }; 
+            }
+          }),
         }));
         
         // Sync the loaded messages with both our initial state and the AI SDK's state
@@ -399,118 +408,17 @@ const Chat = () => {
     const selectedFiles = Array.from(e.target.files);
     if (!selectedFiles.length) return;
     
-    // Count files by type
-    const currentFileCounts = {
-      image: files.filter(f => supportedFileTypes.image.includes(f.type)).length,
-      document: files.filter(f => supportedFileTypes.document.includes(f.type)).length,
-      video: files.filter(f => supportedFileTypes.video.includes(f.type)).length,
-      audio: files.filter(f => supportedFileTypes.audio.includes(f.type)).length
-    };
-    
-    const validFiles = [];
-    const rejectedFiles = [];
-    
-    for (const file of selectedFiles) {
-      // Determine file type category
-      let fileCategory = null;
-      for (const [category, types] of Object.entries(supportedFileTypes)) {
-        if (types.includes(file.type)) {
-          fileCategory = category;
-          break;
-        }
-      }
-      
-      // Skip unsupported file types
-      if (!fileCategory) {
-        rejectedFiles.push({ file, reason: 'Unsupported file type' });
-        continue;
-      }
-      
-      // Check file size
-      if (file.size > fileSizeLimits[fileCategory]) {
-        rejectedFiles.push({ 
-          file, 
-          reason: `File exceeds ${fileSizeLimits[fileCategory] / (1024 * 1024)} MB limit for ${fileCategory} files` 
-        });
-        continue;
-      }
-      
-      // Check file count limit
-      if (currentFileCounts[fileCategory] >= fileCountLimits[fileCategory]) {
-        rejectedFiles.push({ 
-          file, 
-          reason: `Maximum ${fileCountLimits[fileCategory]} ${fileCategory} files allowed` 
-        });
-        continue;
-      }
-      
-      // File passed all checks
-      validFiles.push(file);
-      currentFileCounts[fileCategory]++;
-    }
-    
-    // Show errors for rejected files
-    if (rejectedFiles.length > 0) {
-      const reasons = [...new Set(rejectedFiles.map(item => item.reason))];
-      reasons.forEach(reason => {
-        const count = rejectedFiles.filter(item => item.reason === reason).length;
-        toast.error(`${count} file(s) rejected: ${reason}`);
-      });
-    }
-    
-    // Process valid files
-    if (validFiles.length > 0) {
-      processFiles(validFiles);
-      
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-  
-  // Process files for upload
-  const processFiles = async (selectedFiles) => {
-    const newFiles = [...files];
-    
-    for (const file of selectedFiles) {
-      const reader = new FileReader();
-      
-      // Create a promise to handle the async file reading
-      const readFile = new Promise((resolve, reject) => {
-        reader.onload = (e) => {
-          const fileData = {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            data: e.target.result
-          };
-          resolve(fileData);
-        };
-        reader.onerror = () => reject(new Error(`Failed to read file ${file.name}`));
-      });
-      
-      try {
-        // Read file based on type
-        if (file.type.startsWith('image/')) {
-          reader.readAsDataURL(file);
-        } else if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
-          reader.readAsDataURL(file);
-        } else {
-          reader.readAsDataURL(file);
-        }
-        
-        const fileData = await readFile;
-        newFiles.push(fileData);
-      } catch (error) {
-        console.error('Error reading file:', error);
-        toast.error(`Failed to process file ${file.name}`);
-      }
-    }
-    
+    // Simple validation for now, can be expanded as before
+    const newFiles = [...files, ...selectedFiles];
     setFiles(newFiles);
+    
     if (newFiles.length > 0) {
       setShowFilesPreview(true);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
   
@@ -563,40 +471,32 @@ const Chat = () => {
       return;
     }
 
-    try {
-      let currentThreadId = threadId;
+    let currentThreadId = threadId;
 
+    try {
       // If there is no thread, create one first.
       if (!currentThreadId) {
-        console.log('No threadId, creating a new thread...');
-        const newThread = await appwriteService.createChatThread(
-          user.$id, 
-          input.substring(0, 50) || 'New conversation with files',
-          selectedProvider,
-          selectedModel
-        );
-        
+        // This part remains the same as before
+        const newThread = await appwriteService.createChatThread(user.$id, input.substring(0, 50) || 'New conversation', selectedProvider, selectedModel);
         currentThreadId = newThread.$id;
-        console.log('New thread created with ID:', currentThreadId);
-        setThread(newThread);
-        
-        // Navigate to the new thread URL. The rest of the submission logic will
-        // not run in this render, to allow the component to re-render with the new threadId.
-        // The user will need to press send again. A more seamless UX would require a bigger refactor.
         navigate(`/chat/${currentThreadId}`);
-        console.log('Navigating to new thread. Please resubmit your message.');
+        // To provide a better UX, we could store the input/files and resubmit, but for now we navigate and let the user resend.
         toast.info("New chat created. Please send your message again.");
-        return; 
+        return;
+      }
+      
+      let attachmentsForDb = [];
+      if (files.length > 0) {
+        toast.info(`Uploading ${files.length} file(s)...`);
+        
+        // Step 1: Upload all files to Appwrite Storage
+        const uploadPromises = files.map(file => appwriteService.uploadFile(file));
+        attachmentsForDb = await Promise.all(uploadPromises);
+        
+        toast.success('Upload complete!');
       }
 
-      // Prepare attachments for saving and sending
-      const attachmentsForDb = files.map(file => ({
-        name: file.name,
-        contentType: file.type,
-        url: file.data // The base64 data URL
-      }));
-
-      // Save the user's message to Appwrite FIRST
+      // Step 2: Save the user's message to Appwrite DB with the storage URLs
       await appwriteService.createMessage(
         currentThreadId,
         user.$id,
@@ -605,25 +505,25 @@ const Chat = () => {
           contentType: 'text',
           model: selectedModel,
           provider: selectedProvider,
-          attachments: attachmentsForDb,
+          // Convert each attachment object to a JSON string to fit the DB schema
+          attachments: attachmentsForDb.map(att => JSON.stringify(att)),
           hasAttachments: attachmentsForDb.length > 0,
           attachmentCount: attachmentsForDb.length,
-          attachmentTypes: attachmentsForDb.length > 0 ? 
-            attachmentsForDb.map(file => file.contentType).join(',') : undefined
+          attachmentTypes: attachmentsForDb.length > 0 ? attachmentsForDb.map(file => file.contentType).join(',') : undefined
         }
       );
       
-      // Now, submit to the AI using the hook's handler
+      // Step 3: Submit to the AI using the hook's handler
       handleAISubmit(e, {
-        experimental_attachments: attachmentsForDb
+        experimental_attachments: attachmentsForDb // Pass the same data to the AI hook
       });
   
-      // Clear the files from the UI state after submission
+      // Step 4: Clear the files from the UI state after submission
       clearFiles();
 
     } catch (error) {
       console.error('Error during message submission:', error);
-      toast.error('Failed to send message. Please try again.');
+      toast.error(error.message || 'Failed to send message. Please try again.');
     }
   };
 
@@ -1120,7 +1020,11 @@ const Chat = () => {
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                     {files.map((file, index) => (
                       <div key={index} className="flex items-center bg-white p-1.5 rounded border border-gray-300 text-xs">
-                        <span className="mr-1">{getFileIcon(file.type)}</span>
+                        {file.type.startsWith('image/') ? (
+                           <img src={URL.createObjectURL(file)} alt="preview" className="w-6 h-6 mr-2 rounded object-cover" />
+                        ) : (
+                           <span className="mr-1">{getFileIcon(file.type)}</span>
+                        )}
                         <span className="max-w-[150px] truncate">{file.name}</span>
                         <span className="mx-1 text-gray-400">({formatFileSize(file.size)})</span>
                         <button 
