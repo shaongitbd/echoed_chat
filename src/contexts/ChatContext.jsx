@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { appwriteService } from '../lib/appwrite';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
-import { toast } from 'sonner';
 
 // Create context
 const ChatContext = createContext({
@@ -193,20 +193,30 @@ export const ChatProvider = ({ children }) => {
   const deleteChatThread = async (threadId) => {
     try {
       setIsLoading(true);
-      await appwriteService.deleteChatThread(threadId);
       
-      // Update threads list
-      setThreads(prev => prev.filter(thread => thread.$id !== threadId));
+      // Show toast notification
+      toast.loading('Deleting chat thread and all messages...');
       
-      // Clear messages if the current thread was deleted
+      // First clear messages if the current thread was deleted
       if (currentThreadId === threadId) {
         setMessages([]);
         setCurrentThreadId(null);
       }
       
+      // Update threads list immediately for better UX
+      setThreads(prev => prev.filter(thread => thread.$id !== threadId));
+      
+      // Delete thread and all its messages from database
+      const result = await appwriteService.deleteChatThread(threadId);
+      
+      toast.success('Chat thread deleted successfully');
       return true;
     } catch (error) {
       console.error('Error deleting chat thread:', error);
+      toast.error('Failed to delete chat thread: ' + (error.message || 'Unknown error'));
+      
+      // Reload threads to restore state in case of error
+      loadThreads();
       return false;
     } finally {
       setIsLoading(false);

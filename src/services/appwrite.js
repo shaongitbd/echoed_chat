@@ -23,28 +23,14 @@ export const createAccount = async (email, password, name) => {
     const newAccount = await account.create('unique()', email, password, name);
     
     if (newAccount.$id) {
-      // Default values for preferences and usage stats
-      const preferences = {
-        providers: [
-          {
-            name: 'openai',
-            enabled: true,
-            apiKey: '',
-            models: [
-              { id: 'gpt-4o', enabled: true, capabilities: ['text'] },
-              { id: 'gpt-3.5-turbo', enabled: true, capabilities: ['text'] },
-            ],
-          },
-        ],
-      };
-      
+      // Only basic usage stats, no default preferences
       const usageStats = {
         textQueries: 0,
         imageGeneration: 0,
         videoGeneration: 0
       };
 
-      // Create user profile in the database
+      // Create user profile in the database with empty preferences
       await databases.createDocument(
         DATABASE_ID,
         USERS_COLLECTION_ID,
@@ -52,7 +38,7 @@ export const createAccount = async (email, password, name) => {
         {
           email,
           name,
-          preferences: JSON.stringify(preferences),
+          preferences: JSON.stringify({}), // Empty preferences object
           plan: 'free',
           usageStats: JSON.stringify(usageStats)
         }

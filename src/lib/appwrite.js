@@ -42,8 +42,7 @@ class AppwriteService {
         // Create user profile
         await this.createUserProfile(response.$id, name, email);
         
-        // Create default user settings
-        await this.createDefaultUserSettings(response.$id);
+        // No longer setting default preferences automatically
       }
       
       return response;
@@ -292,17 +291,9 @@ class AppwriteService {
   }
 
   // Chat thread methods
-  async createChatThread(userId, title = 'New Chat', defaultProvider = 'openai', defaultModel = 'gpt-4o') {
+  async createChatThread(userId, title = 'New Chat', defaultProvider = 'openai', defaultModel = 'gpt-4o', branchData = {}) {
     try {
-      console.log('AppwriteService.createChatThread called with:', {
-        userId,
-        title,
-        defaultProvider,
-        defaultModel
-      });
-      
       if (!userId) {
-        console.error('AppwriteService.createChatThread: userId is missing or invalid');
         throw new Error('User ID is required to create a chat thread');
       }
       
@@ -316,28 +307,30 @@ class AppwriteService {
           invitedUsers: []
         }),
         defaultProvider,
-        defaultModel
+        defaultModel,
+        ...branchData
       };
       
-      console.log('Creating thread with data:', threadData);
-      
-      const result = await databases.createDocument(
+      const permissions = [
+        Permission.read(Role.user(userId)),
+        Permission.update(Role.user(userId)),
+        Permission.delete(Role.user(userId))
+      ];
+
+      const response = await databases.createDocument(
         DATABASE_ID,
         CHAT_THREADS_COLLECTION_ID,
         ID.unique(),
         threadData,
-        [
-          Permission.read(Role.user(userId)),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId))
-        ]
+        permissions
       );
       
-      console.log('Thread created successfully:', result);
-      return result;
+      console.log('Thread created successfully:', response);
+      return response;
+      
     } catch (error) {
-      console.error('Error creating chat thread:', error);
-      throw error;
+      console.error('Error in createChatThread:', error);
+      throw new Error(`Failed to create chat thread: ${error.message}`);
     }
   }
 
@@ -370,20 +363,45 @@ class AppwriteService {
 
   async deleteChatThread(threadId) {
     try {
-      // Delete all messages in this thread first
-      const messages = await this.getMessages(threadId);
-      const deletePromises = messages.documents.map(message => 
-        this.deleteMessage(message.$id)
-      );
+      console.log(`Starting deletion of thread: ${threadId}`);
       
-      await Promise.all(deletePromises);
+      // Get all messages in this thread with a large limit to avoid pagination issues
+      const messages = await this.getMessages(threadId);
+      console.log(`Found ${messages.documents.length} messages to delete in thread ${threadId}`);
+      
+      // Handle message deletion in batches to avoid overwhelming the server
+      const batchSize = 20;
+      for (let i = 0; i < messages.documents.length; i += batchSize) {
+        const batch = messages.documents.slice(i, i + batchSize);
+        const deletePromises = batch.map(async (message) => {
+          try {
+            await this.deleteMessage(message.$id);
+            return { success: true, id: message.$id };
+          } catch (err) {
+            console.error(`Failed to delete message ${message.$id}:`, err);
+            return { success: false, id: message.$id, error: err };
+          }
+        });
+        
+        const results = await Promise.all(deletePromises);
+        const failures = results.filter(r => !r.success);
+        if (failures.length > 0) {
+          console.warn(`Failed to delete ${failures.length} messages`, failures);
+        }
+        
+        console.log(`Deleted batch ${i/batchSize + 1}/${Math.ceil(messages.documents.length/batchSize)}`);
+      }
       
       // Now delete the thread
-      return await databases.deleteDocument(
+      console.log(`Deleting thread document: ${threadId}`);
+      const result = await databases.deleteDocument(
         DATABASE_ID,
         CHAT_THREADS_COLLECTION_ID,
         threadId
       );
+      
+      console.log(`Thread ${threadId} deletion completed`);
+      return result;
     } catch (error) {
       console.error('Error deleting chat thread:', error);
       throw error;
@@ -391,33 +409,44 @@ class AppwriteService {
   }
 
   async getUserChatThreads(userId) {
+    if (!userId) {
+      console.log('No user ID provided, returning empty array.');
+      return { documents: [], total: 0 };
+    }
+    
     try {
-      console.log('AppwriteService: Getting chat threads for user:', userId);
-      
-      if (!userId) {
-        console.error('AppwriteService: getUserChatThreads called with no userId');
-        return { documents: [] };
-      }
-      
-      // Query by createdBy instead of userId to match the schema in README
-      // Make sure userId is a string, not an array
       const cleanUserId = Array.isArray(userId) ? userId[0] : userId;
-      
       const response = await databases.listDocuments(
         DATABASE_ID,
         CHAT_THREADS_COLLECTION_ID,
         [
           Query.equal('createdBy', cleanUserId),
-          Query.orderDesc('$updatedAt')
+          Query.orderDesc('$updatedAt'),
         ]
       );
-      
-      console.log(`AppwriteService: Found ${response.documents.length} threads for user ${cleanUserId}`);
+      console.log('Threads response:', response);
       return response;
     } catch (error) {
-      console.error('AppwriteService: Error getting user chat threads:', error);
+      console.error('Error getting user chat threads:', error);
       // Return empty result instead of throwing error to prevent infinite loops
       return { documents: [] };
+    }
+  }
+
+  async getBranchesForThread(parentThreadId) {
+    if (!parentThreadId) return { documents: [], total: 0 };
+    try {
+      return await databases.listDocuments(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        [
+          Query.equal('branchedFromThread', parentThreadId),
+          Query.orderDesc('$createdAt')
+        ]
+      );
+    } catch (error) {
+      console.error(`Error getting branches for thread ${parentThreadId}:`, error);
+      throw error;
     }
   }
 
@@ -504,13 +533,14 @@ class AppwriteService {
     }
   }
 
-  async getMessages(threadId, parentMessageId = null) {
+  async getMessages(threadId, parentMessageId = null, limit = 1000) {
     try {
-      console.log(`AppwriteService.getMessages called for thread: ${threadId}, parentMessageId: ${parentMessageId}`);
+      console.log(`AppwriteService.getMessages called for thread: ${threadId}, parentMessageId: ${parentMessageId}, limit: ${limit}`);
       
       const queries = [
         Query.equal('threadId', threadId),
-        Query.orderAsc('$createdAt')
+        Query.orderAsc('$createdAt'),
+        Query.limit(limit)
       ];
       
       if (parentMessageId !== null) {

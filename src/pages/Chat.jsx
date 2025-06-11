@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useChat } from '@ai-sdk/react';
 import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import InlineModelSelector from '../components/Chat/InlineModelSelector';
 
 const Chat = () => {
   const { threadId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { userSettings } = useSettings();
@@ -30,10 +31,12 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [editingMessage, setEditingMessage] = useState(null);
+  const [branches, setBranches] = useState({});
   const textareaRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [showFilesPreview, setShowFilesPreview] = useState(false);
   const fileInputRef = useRef(null);
+  const [hasTriggeredAutoResponse, setHasTriggeredAutoResponse] = useState(false);
   
   const currentModelInfo = useMemo(() => {
     return availableModels.find(m => m.id === selectedModel && m.provider === selectedProvider);
@@ -105,6 +108,24 @@ const Chat = () => {
             // Fall back to user settings if thread doesn't have defaults
             setSelectedModel(userSettings.defaultModel);
           }
+
+          // Fetch threads that have branched from the current thread
+          const branchData = await appwriteService.getBranchesForThread(threadId);
+          if (branchData && branchData.documents) {
+            const branchesByMessage = branchData.documents.reduce((acc, branch) => {
+              const msgId = branch.branchedFromMessage;
+              if (msgId) {
+                if (!acc[msgId]) {
+                  acc[msgId] = [];
+                }
+                acc[msgId].push(branch);
+              }
+              return acc;
+            }, {});
+            setBranches(branchesByMessage);
+          } else {
+            setBranches({});
+          }
         } catch (error) {
           console.error('Error loading thread:', error);
           toast.error('Failed to load conversation');
@@ -112,6 +133,9 @@ const Chat = () => {
       };
       
       loadThread();
+    } else {
+      setThread(null);
+      setBranches({});
     }
   }, [threadId, user, userSettings]);
   
@@ -603,6 +627,68 @@ const Chat = () => {
     setShowModelRecommendation(false);
   };
   
+  const handleBranch = async (messageId) => {
+    if (!threadId || !user) {
+      toast.error("Cannot branch from an unsaved conversation.");
+      return;
+    }
+
+    const messageIndex = allMessages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) {
+      toast.error("Could not find the message to branch from.");
+      return;
+    }
+
+    const messagesToCopy = allMessages.slice(0, messageIndex + 1);
+    const lastMessage = messagesToCopy[messagesToCopy.length - 1];
+
+    try {
+      toast.info("Creating a new branch...");
+
+      const newThread = await appwriteService.createChatThread(
+        user.$id,
+        `Branch: ${lastMessage.content.substring(0, 30)}...`,
+        selectedProvider,
+        selectedModel,
+        {
+          branchedFromThread: threadId,
+          branchedFromMessage: messageId,
+        }
+      );
+
+      const messageCreationPromises = messagesToCopy.map(messageToCopy => {
+        const messageMetadata = {
+          contentType: messageToCopy.contentType || 'text',
+          model: messageToCopy.model,
+          provider: messageToCopy.provider,
+          attachments: (messageToCopy.attachments || []).map(att => JSON.stringify(att)),
+          hasAttachments: !!messageToCopy.attachments?.length,
+          attachmentCount: messageToCopy.attachments?.length,
+          attachmentTypes: messageToCopy.attachments?.length > 0 ? messageToCopy.attachments.map(file => file.contentType).join(',') : undefined,
+          imagePrompt: messageToCopy.imagePrompt,
+          videoPrompt: messageToCopy.videoPrompt,
+          isEdited: messageToCopy.isEdited,
+        };
+
+        return appwriteService.createMessage(
+          newThread.$id,
+          messageToCopy.role === 'user' ? user.$id : 'assistant',
+          messageToCopy.content,
+          messageMetadata
+        );
+      });
+
+      await Promise.all(messageCreationPromises);
+
+      toast.success("Successfully created a new branch!");
+      navigate(`/chat/${newThread.$id}`);
+
+    } catch (error) {
+      console.error("Failed to create branch:", error);
+      toast.error("An error occurred while creating the branch.");
+    }
+  };
+
   // Render message content
   const renderMessageContent = (message) => {
     // Text from `content` (for older messages) or joined from `parts` (for new messages)
@@ -628,6 +714,8 @@ const Chat = () => {
       );
     }
     
+    const messageBranches = branches[message.id];
+
     return (
       <div className="relative group">
         {/* Render a grid of user-uploaded images */}
@@ -697,7 +785,7 @@ const Chat = () => {
               <Copy size={15} />
             </button>
             <button
-              onClick={() => toast.info('Branching is not yet implemented.')}
+              onClick={() => handleBranch(message.id)}
               className="p-1 hover:bg-gray-100 rounded"
               title="Branch conversation"
             >
@@ -715,6 +803,31 @@ const Chat = () => {
                 {availableModels.find(m => m.id === message.model)?.name || message.model}
               </span>
             )}
+          </div>
+        )}
+        {messageBranches && messageBranches.length > 0 && (
+          <div className="mt-4 border-t border-gray-200 pt-3 text-sm">
+            <h4 className="font-semibold text-gray-600 mb-2 flex items-center">
+              <GitFork size={14} className="mr-1.5" /> Branches from this message
+            </h4>
+            <ul className="space-y-1">
+              {messageBranches.map(branch => (
+                <li key={branch.$id}>
+                  <button
+                    onClick={() => navigate(`/chat/${branch.$id}`)}
+                    className="w-full text-left p-1.5 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    <div className="flex items-center text-gray-800">
+                      <span className="mr-2 text-gray-400">↳</span>
+                      <span className="truncate flex-1">{branch.title}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 pl-5">
+                      Created {formatDistanceToNow(new Date(branch.$createdAt), { addSuffix: true })}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
@@ -818,6 +931,32 @@ const Chat = () => {
         toast.error("UI was updated, but failed to delete messages from the database.");
     });
   };
+  
+  // Add effect to check for autoResponse parameter
+  useEffect(() => {
+    const checkForAutoResponse = async () => {
+      const searchParams = new URLSearchParams(location.search);
+      const shouldAutoRespond = searchParams.get('autoResponse') === 'true';
+      
+      // Only process if we haven't already triggered the auto-response
+      // and all conditions are met
+      if (shouldAutoRespond && threadId && messages.length > 0 && !hasTriggeredAutoResponse) {
+        // Mark that we've triggered the auto-response to prevent multiple calls
+        setHasTriggeredAutoResponse(true);
+        
+        // Remove the parameter from URL immediately to prevent reload issues
+        navigate(`/chat/${threadId}`, { replace: true });
+        
+        // Give a small delay for UI to stabilize
+        setTimeout(() => {
+          // Trigger AI response
+          reload();
+        }, 800);
+      }
+    };
+    
+    checkForAutoResponse();
+  }, [threadId, messages, location.search, navigate, reload, hasTriggeredAutoResponse]);
   
   return (
     <div className="flex h-screen bg-gray-50 font-sans">

@@ -53,26 +53,14 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
     toast.success('Auth state refreshed');
   };
 
-  const handleNewChat = async (e) => {
+  const handleNewChat = (e) => {
     e.preventDefault(); // Prevent default action
     e.stopPropagation(); // Stop event propagation
     
-    console.log('New chat clicked, user:', user);
+    console.log('New chat clicked, navigating to home');
     
     if (user) {
-      try {
-        console.log('Creating new chat thread for user:', user.$id);
-        const newThread = await createChatThread('New Chat');
-        if (newThread) {
-          console.log('New thread created:', newThread);
-          navigate(`/chat/${newThread.$id}`);
-        } else {
-          console.error('Failed to create new thread');
-        }
-      } catch (error) {
-        console.error('Error creating new chat:', error);
-        toast.error('Failed to create new chat');
-      }
+      navigate('/');
     } else {
       console.log('No user found, navigating to login');
       navigate('/login');
@@ -85,6 +73,9 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
       await deleteChatThread(threadId);
       setDeleteConfirmation(null);
       toast.success('Chat deleted successfully');
+      
+      // Redirect to home after deleting thread
+      navigate('/');
     } catch (error) {
       console.error('Error deleting chat:', error);
       toast.error('Failed to delete chat');

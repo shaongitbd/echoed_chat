@@ -1,15 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { appwriteService } from '../lib/appwrite';
+import { toast } from 'sonner';
 
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { userSettings } = useSettings();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [input, setInput] = useState('');
+  const [isCheckingPreferences, setIsCheckingPreferences] = useState(true);
+  const [showPreferencesPrompt, setShowPreferencesPrompt] = useState(false);
+
+  // Check if the user has set their preferences
+  useEffect(() => {
+    const checkUserPreferences = async () => {
+      if (user) {
+        try {
+          setIsCheckingPreferences(true);
+          const userProfile = await appwriteService.getUserProfile(user.$id);
+          
+          // Check if user has preferences set
+          if (!userProfile.preferences || 
+              typeof userProfile.preferences === 'string' && userProfile.preferences === '{}' ||
+              typeof userProfile.preferences === 'object' && 
+              (!userProfile.preferences.providers || userProfile.preferences.providers.length === 0)) {
+            
+            console.log('User has no preferences set, showing setup prompt');
+            setShowPreferencesPrompt(true);
+          }
+        } catch (error) {
+          console.error('Error checking user preferences:', error);
+          toast.error('Failed to load your preferences');
+        } finally {
+          setIsCheckingPreferences(false);
+        }
+      } else {
+        setIsCheckingPreferences(false);
+      }
+    };
+    
+    checkUserPreferences();
+  }, [user]);
 
   const handleInputFocus = () => {
     if (!user) {
@@ -25,6 +62,58 @@ const Home = () => {
     setShowMobileMenu(false);
   };
   
+  const handleStartChat = async () => {
+    if (!input.trim()) return;
+
+    if (!user) {
+      handleInputFocus();
+      return;
+    }
+
+    if (!userSettings?.defaultProvider || !userSettings?.defaultModel) {
+      toast.error('Please set up your default AI model in settings first.');
+      navigate('/model-selection');
+      return;
+    }
+
+    try {
+      // Store input locally before clearing it, so we still have a reference to it
+      const messageContent = input.trim();
+      
+      // Reset input field immediately for better UX
+      setInput('');
+      
+      toast.info('Creating new chat...');
+      
+      // Create thread with user's message as the title
+      const newThread = await appwriteService.createChatThread(
+        user.$id,
+        messageContent.substring(0, 50),
+        userSettings.defaultProvider,
+        userSettings.defaultModel
+      );
+
+      // Add the first message to the thread
+      await appwriteService.createMessage(
+        newThread.$id,
+        user.$id,
+        messageContent,
+        {
+          contentType: 'text',
+          model: userSettings.defaultModel,
+          provider: userSettings.defaultProvider,
+        }
+      );
+
+      // Navigate to the new chat with a parameter that signals 
+      // we need to auto-generate a response
+      navigate(`/chat/${newThread.$id}?autoResponse=true`, { replace: true });
+    } catch (error) {
+      console.error('Failed to start new chat:', error);
+      toast.error('Could not start a new chat. Please try again.');
+    }
+  };
+
   const ExamplePrompt = ({ icon, text }) => (
     <button
       onClick={handleInputFocus}
@@ -36,6 +125,20 @@ const Home = () => {
       </div>
     </button>
   );
+
+  // Show loading state while checking preferences
+  if (isCheckingPreferences && user) {
+    return (
+      <div className="flex h-screen bg-gray-50 font-sans items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center mx-auto shadow-lg animate-pulse">
+            <Sparkles size={32} className="text-white" />
+          </div>
+          <p className="mt-4 text-gray-600">Loading your preferences...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
@@ -68,6 +171,24 @@ const Home = () => {
 
         {/* Welcome screen / Chat area */}
         <section className="flex-1 flex flex-col justify-center items-center p-8 overflow-y-auto">
+          {showPreferencesPrompt && (
+            <div className="w-full max-w-lg mb-8 bg-white p-6 rounded-lg border border-yellow-200 shadow-md">
+              <div className="flex items-center justify-center mb-4">
+                <Settings size={24} className="text-yellow-500 mr-2" />
+                <h3 className="text-lg font-medium text-gray-800">Set Up AI Models</h3>
+              </div>
+              <p className="text-gray-600 mb-4 text-center">
+                To start using the chat, you need to set up your AI model preferences first.
+              </p>
+              <button
+                onClick={() => navigate('/model-selection')}
+                className="w-full py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Set Up Now
+              </button>
+            </div>
+          )}
+          
           <div className="w-full max-w-lg text-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center mx-auto shadow-lg">
               <Sparkles size={32} className="text-white" />
@@ -111,7 +232,7 @@ const Home = () => {
               />
               <button
                 className={`p-2.5 rounded-lg text-white transition-all duration-200 ${input.trim() ? 'bg-gradient-to-r from-gray-900 to-gray-800 shadow-sm' : 'bg-gray-300'}`}
-                onClick={handleInputFocus}
+                onClick={handleStartChat}
                 disabled={!input.trim()}
               >
                 <Send size={16} />

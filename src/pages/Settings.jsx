@@ -380,8 +380,23 @@ const Settings = () => {
       const loadProviderSettings = async () => {
         try {
           if (user) {
-            const settings = await appwriteService.getUserSettings(user.$id);
-            setProviderSettings(settings);
+            // Get user profile which contains preferences
+            const userProfile = await appwriteService.getUserProfile(user.$id);
+            if (userProfile && userProfile.preferences) {
+              // Parse preferences if it's a string, otherwise use as is
+              const preferences = typeof userProfile.preferences === 'string' 
+                ? JSON.parse(userProfile.preferences) 
+                : userProfile.preferences;
+              
+              setProviderSettings(preferences);
+            } else {
+              // Set default empty state if no preferences found
+              setProviderSettings({
+                providers: [],
+                defaultProvider: '',
+                defaultModel: ''
+              });
+            }
           }
         } catch (error) {
           console.error('Error loading provider settings:', error);
