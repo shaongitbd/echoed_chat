@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, BarChart3, Layers, Loader2, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, BarChart3, Layers, Loader2, Save, CheckCircle, AlertCircle, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
+import DataExportImport from '../components/DataExportImport';
 import { appwriteService } from '../lib/appwrite';
 
 // Mock subscription tiers
@@ -576,6 +577,8 @@ const Settings = () => {
         return <UsageTab handleUpgradeSubscription={handleUpgradeSubscription} />;
       case 'providers':
         return <ProvidersTab user={user} handleEditProviders={handleEditProviders} />;
+      case 'data':
+        return <DataExportImport user={user} />;
       default:
         return <ProfileTab 
             profileForm={profileForm} 
@@ -640,6 +643,18 @@ const Settings = () => {
                 >
                   <Layers className="h-4 w-4 mr-2" />
                   Providers
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('data')}
+                  className={`${
+                    activeTab === 'data'
+                      ? 'border-gray-900 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+                >
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Import/Export
                 </button>
               </nav>
             </div>

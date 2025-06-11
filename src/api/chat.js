@@ -27,7 +27,10 @@ export async function handleChatRequest(req) {
     
     // Check for image generation intent for capable Google models
     let isImageGenerationIntent = false;
-    if (provider === 'google' && modelCapabilities?.includes('image') && messages.length > 0) {
+    if (provider === 'google' && 
+        (model === 'gemini-2.0-flash-preview-image-generation' || 
+         modelCapabilities?.includes('image')) && 
+        messages.length > 0) {
         const lastMessage = messages[messages.length - 1];
         if (lastMessage.role === 'user' && typeof lastMessage.content === 'string') {
             const userContent = lastMessage.content.toLowerCase();
@@ -82,6 +85,7 @@ export async function handleChatRequest(req) {
       case 'google':
         aiProvider = createGoogleGenerativeAI({ apiKey });
         break;
+       
       case 'openai':
       default:
         aiProvider = createOpenAI({ apiKey });

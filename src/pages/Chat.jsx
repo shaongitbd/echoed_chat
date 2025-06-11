@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useChat } from '@ai-sdk/react';
-import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film } from 'lucide-react';
+import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -13,6 +13,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { nord } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ModelRecommendation from '../components/Chat/ModelRecommendation';
 import InlineModelSelector from '../components/Chat/InlineModelSelector';
+import ShareModal from '../components/ShareModal';
 
 const Chat = () => {
   const { threadId } = useParams();
@@ -22,6 +23,7 @@ const Chat = () => {
   const { userSettings } = useSettings();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [thread, setThread] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('openai');
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
@@ -988,14 +990,28 @@ const Chat = () => {
             )}
           </div>
           
-          {/* Model selector button */}
-          <button
-            onClick={() => setShowModelSelector(!showModelSelector)}
-            className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm"
-          >
-            <Settings size={14} />
-            {availableModels.find(m => m.id === selectedModel)?.name || selectedModel}
-          </button>
+          <div className="flex items-center space-x-2">
+            {/* Share button - only show if thread exists */}
+            {thread && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm"
+                title="Share this chat"
+              >
+                <Share2 size={14} />
+                Share
+              </button>
+            )}
+            
+            {/* Model selector button */}
+            <button
+              onClick={() => setShowModelSelector(!showModelSelector)}
+              className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm"
+            >
+              <Settings size={14} />
+              {availableModels.find(m => m.id === selectedModel)?.name || selectedModel}
+            </button>
+          </div>
           
           {/* Model selector dropdown */}
           {showModelSelector && (
@@ -1276,6 +1292,14 @@ const Chat = () => {
             </form>
           )}
         </footer>
+        
+        {/* Share Modal */}
+        <ShareModal 
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          threadId={threadId}
+          currentUser={user}
+        />
       </main>
     </div>
   );

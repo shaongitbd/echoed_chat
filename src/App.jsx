@@ -14,7 +14,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
 import Settings from './pages/Settings';
-import ShareChat from './pages/ShareChat';
+import SharedChat from './pages/SharedChat';
 import ResetPassword from './pages/ResetPassword';
 import ModelSelection from './pages/ModelSelection';
 import NotFound from './pages/NotFound';
@@ -88,18 +88,13 @@ const App = () => {
                 />
                 
                 {/* App routes */}
-                <Route
-                  path="/chat"
-                  element={
-                    <ProtectedRoute>
-                      <Layout />
-                    </ProtectedRoute>
-                  }
-                >
+                <Route path="/chat" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                   <Route index element={<Chat />} />
                   <Route path=":threadId" element={<Chat />} />
-                  <Route path="share/:threadId" element={<ShareChat />} />
                 </Route>
+                
+                {/* Shared Chat route - accessible to everyone */}
+                <Route path="/shared/:threadId" element={<SharedChat />} />
                 
                 {/* 404 route */}
                 <Route path="*" element={<NotFound />} />

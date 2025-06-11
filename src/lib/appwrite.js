@@ -318,7 +318,24 @@ class AppwriteService {
 
   async updateChatThread(threadId, data) {
     try {
-      return true;
+      if (!threadId) {
+        throw new Error('Thread ID is required');
+      }
+      
+      // Get the current thread to preserve its permissions
+      const thread = await this.getChatThread(threadId);
+      const permissions = thread.$permissions || [];
+      
+      // Update the thread document
+      const response = await databases.updateDocument(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        threadId,
+        data,
+        permissions
+      );
+      
+      return response;
     } catch (error) {
       console.error('Error updating chat thread:', error);
       throw error;
@@ -465,6 +482,12 @@ class AppwriteService {
         tokensUsed = 0
       } = options;
       
+      // Get the thread to copy its permissions
+      const thread = await this.getChatThread(threadId);
+      
+      // Apply the same permissions as the thread
+      const permissions = thread.$permissions || [];
+      
       const message = await databases.createDocument(
         DATABASE_ID,
         MESSAGES_COLLECTION_ID,
@@ -482,7 +505,8 @@ class AppwriteService {
           searchMetadata,
           contextLength,
           tokensUsed
-        }
+        },
+        permissions // Apply thread permissions to message
       );
       
       // Update the thread to trigger Appwrite's automatic $updatedAt refresh
@@ -1070,6 +1094,304 @@ class AppwriteService {
       return true;
     } catch (error) {
       console.error('Error updating cursor position:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to update message permissions for a thread
+  async updateMessagePermissions(threadId, permissions) {
+    try {
+      // Get all messages for this thread
+      const messages = await this.getMessages(threadId, null, 1000); // Get up to 1000 messages
+      
+      if (messages && messages.documents && messages.documents.length > 0) {
+        console.log(`Updating permissions for ${messages.documents.length} messages in thread ${threadId}`);
+        
+        // Handle messages in batches to avoid overwhelming the server
+        const batchSize = 50;
+        for (let i = 0; i < messages.documents.length; i += batchSize) {
+          const batch = messages.documents.slice(i, i + batchSize);
+          
+          // Update each message's permissions
+          const updatePromises = batch.map(message => 
+            databases.updateDocument(
+              DATABASE_ID,
+              MESSAGES_COLLECTION_ID,
+              message.$id,
+              {}, // Empty update just to set permissions
+              permissions
+            )
+          );
+          
+          await Promise.all(updatePromises);
+          console.log(`Updated permissions for batch ${Math.ceil(i/batchSize) + 1}/${Math.ceil(messages.documents.length/batchSize)}`);
+        }
+        
+        return true;
+      } else {
+        console.log(`No messages found for thread ${threadId}`);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error updating message permissions:', error);
+      throw error;
+    }
+  }
+  
+  async shareThreadPublic(threadId) {
+    try {
+      // Get the current thread
+      const thread = await this.getChatThread(threadId);
+      
+      // Add a public read permission to the thread document
+      const permissions = [
+        ...thread.$permissions || [],
+        Permission.read(Role.any())  // Allow any user to read
+      ];
+      
+      // Ensure we don't have duplicate permissions
+      const uniquePermissions = [...new Set(permissions)];
+      
+      // Update the thread with public permissions
+      const response = await databases.updateDocument(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        threadId,
+        {
+          isShared: true,
+          shareSettings: JSON.stringify({
+            public: true,
+            invitedUsers: JSON.parse(thread.shareSettings || '{"invitedUsers":[]}').invitedUsers || []
+          })
+        },
+        uniquePermissions
+      );
+      
+      // Update all messages to have public read access
+      await this.updateMessagePermissions(threadId, [...uniquePermissions]);
+      
+      return response;
+    } catch (error) {
+      console.error('Error sharing thread publicly:', error);
+      throw error;
+    }
+  }
+  
+  async makeThreadPrivate(threadId) {
+    try {
+      // Get the current thread
+      const thread = await this.getChatThread(threadId);
+      const createdBy = thread.createdBy;
+      
+      // Filter out the public read permission
+      const filteredPermissions = (thread.$permissions || []).filter(
+        permission => permission !== `read("any")`
+      );
+      
+      // Ensure the owner still has full permissions
+      const permissions = [
+        ...filteredPermissions,
+        Permission.read(Role.user(createdBy)),
+        Permission.update(Role.user(createdBy)),
+        Permission.delete(Role.user(createdBy))
+      ];
+      
+      // Update thread with private permissions
+      const response = await databases.updateDocument(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        threadId,
+        {
+          isShared: false,
+          shareSettings: JSON.stringify({
+            public: false,
+            invitedUsers: JSON.parse(thread.shareSettings || '{"invitedUsers":[]}').invitedUsers || []
+          })
+        },
+        permissions
+      );
+      
+      // Update all messages to have the same permissions
+      await this.updateMessagePermissions(threadId, permissions);
+      
+      return response;
+    } catch (error) {
+      console.error('Error making thread private:', error);
+      throw error;
+    }
+  }
+  
+  async shareThreadWithUser(threadId, emailToShare) {
+    try {
+      // Try to find the user by email
+      const usersList = await databases.listDocuments(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        [Query.equal('email', emailToShare)]
+      );
+      
+      if (usersList.documents.length === 0) {
+        throw new Error('User not found');
+      }
+      
+      const userToShare = usersList.documents[0];
+      
+      // Get the current thread
+      const thread = await this.getChatThread(threadId);
+      
+      // Parse existing share settings
+      let shareSettings = { public: false, invitedUsers: [] };
+      try {
+        shareSettings = JSON.parse(thread.shareSettings || '{}');
+        if (!shareSettings.invitedUsers) {
+          shareSettings.invitedUsers = [];
+        }
+      } catch (e) {
+        console.error('Error parsing share settings:', e);
+      }
+      
+      // Check if user is already invited
+      const userAlreadyInvited = shareSettings.invitedUsers.some(
+        user => user.email === emailToShare
+      );
+      
+      if (!userAlreadyInvited) {
+        // Add user to invited users
+        shareSettings.invitedUsers.push({
+          userId: userToShare.$id,
+          email: emailToShare,
+          name: userToShare.name || '',
+          role: 'viewer'
+        });
+      }
+      
+      // Add read permission for this user
+      const permissions = [
+        ...thread.$permissions || [],
+        Permission.read(Role.user(userToShare.$id))
+      ];
+      
+      // Update the thread
+      const response = await databases.updateDocument(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        threadId,
+        {
+          isShared: true,
+          shareSettings: JSON.stringify(shareSettings)
+        },
+        permissions
+      );
+      
+      // Update all messages to have the same permissions
+      await this.updateMessagePermissions(threadId, permissions);
+      
+      return response;
+    } catch (error) {
+      console.error('Error sharing thread with user:', error);
+      throw error;
+    }
+  }
+  
+  async getSharedUsers(threadId) {
+    try {
+      // Get the thread
+      const thread = await this.getChatThread(threadId);
+      
+      // Get the owner's info
+      const owner = await databases.getDocument(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        thread.createdBy
+      );
+      
+      // Parse share settings
+      let shareSettings = { invitedUsers: [] };
+      try {
+        shareSettings = JSON.parse(thread.shareSettings || '{}');
+      } catch (e) {
+        console.error('Error parsing share settings:', e);
+      }
+      
+      // Build users list with owner first
+      const users = [
+        {
+          userId: owner.$id,
+          email: owner.email,
+          name: owner.name,
+          role: 'owner',
+          isOwner: true
+        },
+        ...shareSettings.invitedUsers
+      ];
+      
+      return users;
+    } catch (error) {
+      console.error('Error getting shared users:', error);
+      throw error;
+    }
+  }
+  
+  async removeThreadAccess(threadId, userId) {
+    try {
+      // Get the thread
+      const thread = await this.getChatThread(threadId);
+      
+      // Parse share settings
+      let shareSettings = { public: false, invitedUsers: [] };
+      try {
+        shareSettings = JSON.parse(thread.shareSettings || '{}');
+      } catch (e) {
+        console.error('Error parsing share settings:', e);
+      }
+      
+      // Remove user from invited users
+      shareSettings.invitedUsers = shareSettings.invitedUsers.filter(
+        user => user.userId !== userId
+      );
+      
+      // Remove read permission for this user
+      const permissions = (thread.$permissions || []).filter(
+        permission => !permission.includes(`user:${userId}`)
+      );
+      
+      // Update the thread
+      const response = await databases.updateDocument(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        threadId,
+        {
+          shareSettings: JSON.stringify(shareSettings),
+          isShared: shareSettings.public || shareSettings.invitedUsers.length > 0
+        },
+        permissions
+      );
+      
+      // Update all messages to have the same permissions
+      await this.updateMessagePermissions(threadId, permissions);
+      
+      return response;
+    } catch (error) {
+      console.error('Error removing thread access:', error);
+      throw error;
+    }
+  }
+
+  async getUser(userId) {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      
+      const user = await databases.getDocument(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        userId
+      );
+      
+      return user;
+    } catch (error) {
+      console.error('Error fetching user:', error);
       throw error;
     }
   }
