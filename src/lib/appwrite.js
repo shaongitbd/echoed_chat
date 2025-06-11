@@ -88,6 +88,28 @@ class AppwriteService {
     }
   }
 
+  async updateUserName(name) {
+    try {
+      const user = await account.updateName(name);
+      // Also update the profile document if it exists
+      await this.updateUserProfile(user.$id, { name });
+      return user;
+    } catch (error) {
+      console.error('Error updating user name:', error);
+      throw new Error(`Failed to update user name: ${error.message}`);
+    }
+  }
+
+  async updateUserPassword(newPassword, oldPassword) {
+    try {
+      return await account.updatePassword(newPassword, oldPassword);
+    } catch (error) {
+      console.error('Error updating user password:', error);
+      // Appwrite often returns a helpful message
+      throw new Error(`Failed to update password: ${error.message}`);
+    }
+  }
+
   async updatePassword(password, oldPassword) {
     try {
       return await account.updatePassword(password, oldPassword);
@@ -207,40 +229,7 @@ class AppwriteService {
   // User settings methods
   async createDefaultUserSettings(userId) {
     try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        USER_SETTINGS_COLLECTION_ID,
-        userId,
-        {
-          providers: [
-            {
-              name: 'openai',
-              enabled: true,
-              apiKey: '', // Will be filled by user
-              models: [
-                {
-                  id: 'gpt-4o',
-                  enabled: true,
-                  capabilities: ['text', 'image']
-                },
-                {
-                  id: 'gpt-3.5-turbo',
-                  enabled: true,
-                  capabilities: ['text']
-                }
-              ]
-            }
-          ],
-          defaultProvider: 'openai',
-          defaultModel: 'gpt-4o',
-          theme: 'system',
-          notifications: {
-            email: true,
-            inApp: true
-          },
-          defaultSearchProvider: 'web'
-        }
-      );
+     console.log('Sorry we are not ready for this yet');
     } catch (error) {
       console.error('Error creating default user settings:', error);
       throw error;
@@ -366,11 +355,11 @@ class AppwriteService {
       console.log(`Starting deletion of thread: ${threadId}`);
       
       // Get all messages in this thread with a large limit to avoid pagination issues
-      const messages = await this.getMessages(threadId);
+      const messages = await this.getMessages(threadId, null, 5000); // Increased limit
       console.log(`Found ${messages.documents.length} messages to delete in thread ${threadId}`);
       
       // Handle message deletion in batches to avoid overwhelming the server
-      const batchSize = 20;
+      const batchSize = 50;
       for (let i = 0; i < messages.documents.length; i += batchSize) {
         const batch = messages.documents.slice(i, i + batchSize);
         const deletePromises = batch.map(async (message) => {
@@ -533,7 +522,7 @@ class AppwriteService {
     }
   }
 
-  async getMessages(threadId, parentMessageId = null, limit = 1000) {
+  async getMessages(threadId, parentMessageId = null, limit = 100) {
     try {
       console.log(`AppwriteService.getMessages called for thread: ${threadId}, parentMessageId: ${parentMessageId}, limit: ${limit}`);
       

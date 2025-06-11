@@ -46,114 +46,7 @@ const SUBSCRIPTION_TIERS = [
   }
 ];
 
-const Settings = () => {
-  const navigate = useNavigate();
-  const { user, updateUserProfile, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('profile');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
-  
-  // Profile form state
-  const [profileForm, setProfileForm] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  
-  const [formErrors, setFormErrors] = useState({});
-  
-  // Handle profile form change
-  const handleProfileChange = (e) => {
-    const { name, value } = e.target;
-    setProfileForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error when field is edited
-    if (formErrors[name]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [name]: null
-      }));
-    }
-  };
-  
-  // Handle profile form submission
-  const handleProfileSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    // Validate form
-    const errors = {};
-    
-    if (!profileForm.name.trim()) {
-      errors.name = 'Name is required';
-    }
-    
-    // Only validate password fields if user is trying to change password
-    if (profileForm.newPassword || profileForm.confirmPassword || profileForm.currentPassword) {
-      if (!profileForm.currentPassword) {
-        errors.currentPassword = 'Current password is required to change password';
-      }
-      
-      if (profileForm.newPassword && profileForm.newPassword.length < 8) {
-        errors.newPassword = 'New password must be at least 8 characters';
-      }
-      
-      if (profileForm.newPassword !== profileForm.confirmPassword) {
-        errors.confirmPassword = 'Passwords do not match';
-      }
-    }
-    
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      setIsLoading(false);
-      return;
-    }
-    
-    try {
-      // Mock API call - in a real app, this would call your backend
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Update user profile
-      await updateUserProfile({
-        name: profileForm.name,
-        ...(profileForm.newPassword ? { password: profileForm.newPassword } : {})
-      });
-      
-      toast.success('Profile updated successfully');
-      
-      // Clear password fields
-      setProfileForm(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      }));
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Navigate to model selection page
-  const handleEditProviders = () => {
-    navigate('/model-selection');
-  };
-  
-  // Handle subscription upgrade
-  const handleUpgradeSubscription = (tierId) => {
-    toast.info(`Redirecting to upgrade to ${tierId} plan...`);
-    // In a real app, this would redirect to a payment page
-  };
-  
-  // Tab content components
-  const ProfileTab = () => (
+const ProfileTab = ({ profileForm, handleProfileChange, handleProfileSubmit, formErrors, isLoading, logout }) => (
     <form onSubmit={handleProfileSubmit} className="space-y-6">
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -280,9 +173,9 @@ const Settings = () => {
         </button>
       </div>
     </form>
-  );
-  
-  const UsageTab = () => (
+);
+
+const UsageTab = ({ handleUpgradeSubscription }) => (
     <div className="space-y-8">
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-2">Your Subscription</h3>
@@ -369,9 +262,9 @@ const Settings = () => {
         </div>
       </div>
     </div>
-  );
-  
-  const ProvidersTab = () => {
+);
+
+const ProvidersTab = ({ user, handleEditProviders }) => {
     // Get user settings for providers
     const [providerSettings, setProviderSettings] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -542,19 +435,156 @@ const Settings = () => {
         </div>
       </div>
     );
+};
+
+const Settings = () => {
+  const navigate = useNavigate();
+  const { user, updateUserProfile, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('profile');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  
+  const [formErrors, setFormErrors] = useState({});
+  
+  // Handle profile form change
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    setProfileForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear error when field is edited
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: null
+      }));
+    }
+  };
+  
+  // Handle profile form submission
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    const errors = {};
+    
+    if (!profileForm.name.trim()) {
+      errors.name = 'Name is required';
+    }
+    
+    // Only validate password fields if user is trying to change password
+    if (profileForm.newPassword || profileForm.confirmPassword || profileForm.currentPassword) {
+      if (!profileForm.currentPassword) {
+        errors.currentPassword = 'Current password is required to change password';
+      }
+      
+      if (profileForm.newPassword && profileForm.newPassword.length < 8) {
+        errors.newPassword = 'New password must be at least 8 characters';
+      }
+      
+      if (profileForm.newPassword !== profileForm.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match';
+      }
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      let nameUpdated = false;
+      let passwordUpdated = false;
+
+      // Update name if changed
+      if (profileForm.name.trim() && profileForm.name !== user.name) {
+        await appwriteService.updateUserName(profileForm.name);
+        nameUpdated = true;
+      }
+
+      // Update password if new password is provided
+      if (profileForm.newPassword) {
+        await appwriteService.updateUserPassword(profileForm.newPassword, profileForm.currentPassword);
+        passwordUpdated = true;
+      }
+      
+      // If we made updates, refresh the user data in the auth context
+      if (nameUpdated) {
+        // This will fetch the latest user data from appwrite account
+        await updateUserProfile(); 
+      }
+      
+      if (nameUpdated || passwordUpdated) {
+        toast.success('Profile updated successfully!');
+      } else {
+        toast.info('No changes were made.');
+      }
+      
+      // Clear password fields
+      setProfileForm(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }));
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error(error.message || 'Failed to update profile.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Navigate to model selection page
+  const handleEditProviders = () => {
+    navigate('/model-selection');
+  };
+  
+  // Handle subscription upgrade
+  const handleUpgradeSubscription = (tierId) => {
+    toast.info(`Redirecting to upgrade to ${tierId} plan...`);
+    // In a real app, this would redirect to a payment page
   };
   
   // Render tab content based on active tab
   const renderTabContent = () => {
     switch (activeTab) {
       case 'profile':
-        return <ProfileTab />;
+        return <ProfileTab 
+            profileForm={profileForm} 
+            handleProfileChange={handleProfileChange}
+            handleProfileSubmit={handleProfileSubmit}
+            formErrors={formErrors}
+            isLoading={isLoading}
+            logout={logout}
+        />;
       case 'usage':
-        return <UsageTab />;
+        return <UsageTab handleUpgradeSubscription={handleUpgradeSubscription} />;
       case 'providers':
-        return <ProvidersTab />;
+        return <ProvidersTab user={user} handleEditProviders={handleEditProviders} />;
       default:
-        return <ProfileTab />;
+        return <ProfileTab 
+            profileForm={profileForm} 
+            handleProfileChange={handleProfileChange}
+            handleProfileSubmit={handleProfileSubmit}
+            formErrors={formErrors}
+            isLoading={isLoading}
+            logout={logout}
+        />;
     }
   };
   
