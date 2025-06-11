@@ -1,7 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { appwriteService } from '../lib/appwrite';
 import { useAuth } from './AuthContext';
-import { getAllProviders } from '../lib/modelService';
+import { PROVIDERS } from '../lib/providers';
+
+// Convert PROVIDERS array to object format for compatibility
+const getAllProviders = () => {
+  return PROVIDERS.reduce((acc, provider) => {
+    acc[provider.id.toLowerCase()] = {
+      name: provider.name,
+      models: provider.models.map(model => ({
+        id: model.id,
+        name: model.name,
+        capabilities: model.capabilities || ['text']
+      }))
+    };
+    return acc;
+  }, {});
+};
 
 // Create context
 const SettingsContext = createContext({
