@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { toast } from 'sonner';
-import * as appwriteService from '../services/appwrite';
+import { appwriteService, account, databases } from '../lib/appwrite';
 
 // Create context
 const AuthContext = createContext();
@@ -21,27 +21,26 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true);
       
-      // First check if we have an active session
-      console.log('Checking for active session...');
-      const session = await appwriteService.checkSession();
-      console.log('Session check result:', session);
-      
-      if (!session) {
-        console.log('No active session found, setting user to null');
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log('Active session found, getting user data');
-      const currentUser = await appwriteService.getCurrentUser();
-      console.log('Current user data:', currentUser);
-      
-      if (currentUser) {
-        console.log('Setting user state with:', currentUser);
-        setUser(currentUser);
-      } else {
-        console.log('No user data found despite active session, setting user to null');
+      try {
+        // Check if we have an active session using account directly
+        console.log('Checking for active session...');
+        await account.get();
+        console.log('Session exists');
+        
+        // Get user data
+        console.log('Active session found, getting user data');
+        const currentUser = await appwriteService.getCurrentUser();
+        console.log('Current user data:', currentUser);
+        
+        if (currentUser) {
+          console.log('Setting user state with:', currentUser);
+          setUser(currentUser);
+        } else {
+          console.log('No user data found despite active session, setting user to null');
+          setUser(null);
+        }
+      } catch (sessionError) {
+        console.log('No active session found:', sessionError);
         setUser(null);
       }
     } catch (error) {
@@ -61,7 +60,7 @@ export const AuthProvider = ({ children }) => {
       const newAccount = await appwriteService.createAccount(email, password, name);
       
       // Auto-login after registration
-      await appwriteService.signIn(email, password);
+      await appwriteService.login(email, password);
       await checkAuth(); // Re-check auth after login
       
       return { success: true };
@@ -78,7 +77,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      await appwriteService.signIn(email, password);
+      await appwriteService.login(email, password);
       await checkAuth(); // Re-check auth after login
       
       return { success: true };
@@ -95,7 +94,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      await appwriteService.signOut();
+      await appwriteService.logout();
       setUser(null);
       toast.success('Logged out successfully');
     } catch (error) {
@@ -129,7 +128,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Update user document in database
-      await appwriteService.databases.updateDocument(
+      await databases.updateDocument(
         appwriteService.DATABASE_ID,
         appwriteService.USERS_COLLECTION_ID,
         user.$id,

@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import * as appwriteService from '../services/appwrite';
+import { appwriteService, databases } from '../lib/appwrite';
 import { useAuth } from './AuthContext';
 
 // Create context
@@ -32,9 +32,9 @@ export const ThreadProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      const userThreads = await appwriteService.getThreads(user.$id);
-      setThreads(userThreads);
-      return userThreads;
+      const response = await appwriteService.getUserChatThreads(user.$id);
+      setThreads(response.documents);
+      return response.documents;
     } catch (error) {
       console.error('Error loading threads:', error);
       toast.error('Failed to load conversations');
@@ -51,7 +51,9 @@ export const ThreadProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      const thread = await appwriteService.getThread(threadId);
+      const thread = await appwriteService.getChatThread(threadId);
+      const messagesResponse = await appwriteService.getMessages(threadId);
+      thread.messages = messagesResponse.documents;
       setCurrentThread(thread);
       return thread;
     } catch (error) {
@@ -70,7 +72,7 @@ export const ThreadProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      const newThread = await appwriteService.createThread(user.$id, title);
+      const newThread = await appwriteService.createChatThread(user.$id, title);
       
       // Update local state
       setThreads(prevThreads => [newThread, ...prevThreads]);
@@ -96,7 +98,7 @@ export const ThreadProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      await appwriteService.deleteThread(threadId);
+      await appwriteService.deleteChatThread(threadId);
       
       // Update local state
       setThreads(prevThreads => prevThreads.filter(thread => thread.$id !== threadId));
@@ -122,7 +124,9 @@ export const ThreadProvider = ({ children }) => {
     if (!user) return null;
     
     try {
-      const message = await appwriteService.createMessage(threadId, role, content);
+      // Convert old role format to sender format expected by the new API
+      const sender = role === 'user' ? user.$id : 'assistant';
+      const message = await appwriteService.createMessage(threadId, sender, content);
       
       // Update current thread if it's the active one
       if (currentThread && currentThread.$id === threadId) {
@@ -147,15 +151,7 @@ export const ThreadProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      await appwriteService.databases.updateDocument(
-        appwriteService.DATABASE_ID,
-        appwriteService.THREADS_COLLECTION_ID,
-        threadId,
-        {
-          title,
-          updatedAt: new Date().toISOString()
-        }
-      );
+      await appwriteService.updateChatThread(threadId, { title });
       
       // Update local state
       setThreads(prevThreads => 
