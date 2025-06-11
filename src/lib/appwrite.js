@@ -61,15 +61,6 @@ class AppwriteService {
     }
   }
 
-  async loginWithOAuth(provider) {
-    try {
-      return await account.createOAuth2Session(provider);
-    } catch (error) {
-      console.error(`Error logging in with ${provider}:`, error);
-      throw error;
-    }
-  }
-
   async getCurrentUser() {
     try {
       return await account.get();
@@ -137,23 +128,7 @@ class AppwriteService {
     }
   }
 
-  async sendEmailVerification() {
-    try {
-      return await account.createVerification(`${window.location.origin}/verify-email`);
-    } catch (error) {
-      console.error('Error sending email verification:', error);
-      throw error;
-    }
-  }
 
-  async completeEmailVerification(userId, secret) {
-    try {
-      return await account.updateVerification(userId, secret);
-    } catch (error) {
-      console.error('Error completing email verification:', error);
-      throw error;
-    }
-  }
 
   // User profile methods
   async createUserProfile(userId, name, email) {

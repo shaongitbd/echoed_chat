@@ -58,10 +58,11 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      await appwriteService.createAccount(email, password, name);
+      const newAccount = await appwriteService.createAccount(email, password, name);
       
-      // Send verification email
-      // Note: This would require additional setup in Appwrite
+      // Auto-login after registration
+      await appwriteService.signIn(email, password);
+      await checkAuth(); // Re-check auth after login
       
       return { success: true };
     } catch (error) {
@@ -86,18 +87,6 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error };
     } finally {
       setIsLoading(false);
-    }
-  };
-  
-  // Login with OAuth provider
-  const loginWithOAuth = async (provider) => {
-    try {
-      // Redirect to OAuth provider
-      // This will redirect the user away from the app
-      await appwriteService.account.createOAuth2Session(provider);
-    } catch (error) {
-      console.error(`${provider} login error:`, error);
-      toast.error(`Failed to login with ${provider}`);
     }
   };
   
@@ -191,7 +180,6 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     register,
     login,
-    loginWithOAuth,
     logout,
     refreshAuth,
     updateUserProfile,

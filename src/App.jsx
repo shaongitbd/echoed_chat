@@ -15,7 +15,6 @@ import Register from './pages/Register';
 import Chat from './pages/Chat';
 import Settings from './pages/Settings';
 import ShareChat from './pages/ShareChat';
-import VerifyEmail from './pages/VerifyEmail';
 import ResetPassword from './pages/ResetPassword';
 import ModelSelection from './pages/ModelSelection';
 import NotFound from './pages/NotFound';
@@ -66,7 +65,6 @@ const App = () => {
                     </GuestRoute>
                   }
                 />
-                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 
                 {/* Model selection after signup */}
