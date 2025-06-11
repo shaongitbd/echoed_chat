@@ -78,8 +78,9 @@ export function setupApiMiddleware() {
         if (error.param) errorDetails.param = error.param;
         if (error.reason) errorDetails.reason = error.reason;
         
-        // Handle specific AI provider error formats
-        if (error.response) {
+        // Handle specific AI provider error formats from raw fetch responses.
+        // The Vercel AI SDK error object is already parsed, so we skip this for those errors.
+        if (error.response && typeof error.response.json === 'function') {
           try {
             // Some AI providers include detailed error info in the response
             const responseData = await error.response.json();

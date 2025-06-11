@@ -23,6 +23,7 @@ export async function handleChatRequest(req) {
     
     console.log('Handling chat request with provider:', provider);
     console.log('Messages received:', messages);
+    console.log("model capabilities", modelCapabilities);
     
     // Check for image generation intent for capable Google models
     let isImageGenerationIntent = false;
@@ -96,65 +97,34 @@ export async function handleChatRequest(req) {
     // We just need to make sure the content format is correct
     
     // For edited messages, we create a special stream
-    try {
-      console.log('Streaming text with provided messages');
-      const result = streamText({
-        model: modelInstance,
-        messages: messages,
-        ...((isImageGenerationIntent) && {
-            providerOptions: {
-                google: { responseModalities: ['TEXT', 'IMAGE'] }
-            }
-        })
-      });
-      
-      return result.toDataStreamResponse({
-        extraData: isEdit ? { isEdit: true } : undefined
-      });
-    } catch (error) {
-      console.error('[AI SDK] Error during text generation:', error);
-
-      let errorMessage = 'An unknown error occurred while generating the AI response.';
-      let statusCode = 500;
-
-      // Check for specific error types from the AI SDK or underlying provider
-      if (error.name === 'APIError') {
-        errorMessage = `AI Provider Error: ${error.message}`;
-        // Status code might be on the error object, e.g., 401 for auth, 429 for rate limits
-        statusCode = error.statusCode || 400; 
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      // Return a structured error response
-      return new Response(
-        JSON.stringify({
-          error: {
-            name: error.name || 'UnknownError',
-            message: errorMessage,
-            statusCode: statusCode,
+    const result = streamText({
+      model: modelInstance,
+      messages: messages,
+      ...((isImageGenerationIntent) && {
+          providerOptions: {
+              google: { responseModalities: ['TEXT', 'IMAGE'] }
           }
-        }),
-        { 
-          status: statusCode, 
-          headers: { 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-  } catch (error) {
-    console.error('[AI SDK] General error in chat API handler:', error);
+      })
+    });
     
-    // Check if the error is an APIError and has a specific message
-    let errorMessage = 'An unexpected error occurred while processing the AI response.';
-    if (error.name === 'APIError') {
-      errorMessage = error.message; // Use the specific message from the AI provider
-    }
+    return result.toDataStreamResponse({
+      extraData: isEdit ? { isEdit: true } : undefined,
+      getErrorMessage: (error) => {
+        // The Vercel AI SDK provides a detailed error object.
+        // We pass its message directly to the client.
+        return error.message;
+      },
+    });
+  } catch (error) {
+    // This top-level catch is now for truly unexpected errors,
+    // like issues with reading the request body, not for AI SDK errors.
+    console.error('[API Handler] General error in chat API handler:', error);
     
     return new Response(
       JSON.stringify({ 
         error: {
           name: 'HandlerError',
-          message: errorMessage 
+          message: 'An unexpected error occurred processing your request.' 
         }
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
