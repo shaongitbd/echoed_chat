@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Download, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { appwriteService } from '../lib/appwrite';
+import { Query } from 'appwrite';
+import { appwriteService, databases } from '../lib/appwrite';
 
 const DataExportImport = ({ user }) => {
   const [isExporting, setIsExporting] = useState(false);
@@ -18,11 +19,16 @@ const DataExportImport = ({ user }) => {
     setIsExporting(true);
 
     try {
+      // Get the database and collection IDs
+      const DATABASE_ID = process.env.REACT_APP_APPWRITE_DATABASE_ID || 'chatbot';
+      const CHAT_THREADS_COLLECTION_ID = process.env.REACT_APP_APPWRITE_THREADS_COLLECTION_ID || 'chat-threads';
+      const MESSAGES_COLLECTION_ID = process.env.REACT_APP_APPWRITE_MESSAGES_COLLECTION_ID || 'messages';
+      
       // Get all threads for the current user
-      const threadsResponse = await appwriteService.databases.listDocuments(
-        appwriteService.DATABASE_ID,
-        appwriteService.CHAT_THREADS_COLLECTION_ID,
-        [appwriteService.Query.equal('createdBy', user.$id)]
+      const threadsResponse = await databases.listDocuments(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        [Query.equal('createdBy', user.$id)]
       );
 
       const threads = threadsResponse.documents;
@@ -42,10 +48,10 @@ const DataExportImport = ({ user }) => {
 
       for (const thread of threads) {
         // Get messages for this thread
-        const messagesResponse = await appwriteService.databases.listDocuments(
-          appwriteService.DATABASE_ID,
-          appwriteService.MESSAGES_COLLECTION_ID,
-          [appwriteService.Query.equal('threadId', thread.$id)]
+        const messagesResponse = await databases.listDocuments(
+          DATABASE_ID,
+          MESSAGES_COLLECTION_ID,
+          [Query.equal('threadId', thread.$id)]
         );
 
         const messages = messagesResponse.documents;
@@ -107,7 +113,7 @@ const DataExportImport = ({ user }) => {
       toast.success('Conversations exported successfully');
     } catch (error) {
       console.error('Error exporting data:', error);
-      toast.error('Failed to export conversations');
+      toast.error(`Error exporting data: ${error.message}`);
     } finally {
       setIsExporting(false);
     }
@@ -177,6 +183,10 @@ const DataExportImport = ({ user }) => {
               const messageIdMap = {};
 
               for (const msgData of sortedMessages) {
+                // Ensure the sender is preserved exactly as it was in the original message
+                // This should be either "user" or "assistant" in most cases
+                const sender = msgData.sender || (msgData.content.includes('user:') ? 'user' : 'assistant');
+                
                 // Create the message
                 const messageOptions = {
                   contentType: msgData.contentType || 'text',
@@ -190,9 +200,11 @@ const DataExportImport = ({ user }) => {
                   tokensUsed: msgData.tokensUsed || 0
                 };
 
+                console.log(`Importing message with sender: ${sender}, content: ${msgData.content.substring(0, 50)}...`);
+
                 const newMessage = await appwriteService.createMessage(
                   newThread.$id,
-                  msgData.sender,
+                  sender,
                   msgData.content,
                   messageOptions
                 );
@@ -206,7 +218,7 @@ const DataExportImport = ({ user }) => {
           toast.success(`Successfully imported ${importData.threads.length} conversations`);
         } catch (parseError) {
           console.error('Error parsing import file:', parseError);
-          toast.error('Failed to parse import file');
+          toast.error(`Failed to parse import file: ${parseError.message}`);
         } finally {
           setIsImporting(false);
           // Clear the file input
@@ -223,7 +235,7 @@ const DataExportImport = ({ user }) => {
       reader.readAsText(file);
     } catch (error) {
       console.error('Error importing data:', error);
-      toast.error('Failed to import conversations');
+      toast.error(`Failed to import conversations: ${error.message}`);
       setIsImporting(false);
       e.target.value = null;
     }
