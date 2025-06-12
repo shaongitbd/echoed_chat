@@ -1,4 +1,4 @@
-# Echoed.chat: A Unified AI Chat Experience
+# Echoed.chat: Open source AI Chat 
 
 Echoed.chat is an open-source, feature-rich AI application.  It was build as an open source alternative to t3 chat.
 
