@@ -16,13 +16,6 @@ const USERS_COLLECTION_ID = process.env.REACT_APP_APPWRITE_USERS_COLLECTION_ID |
 const CHAT_THREADS_COLLECTION_ID = process.env.REACT_APP_APPWRITE_THREADS_COLLECTION_ID || 'chat-threads';
 const MESSAGES_COLLECTION_ID = process.env.REACT_APP_APPWRITE_MESSAGES_COLLECTION_ID || 'messages';
 const FILES_COLLECTION_ID = process.env.REACT_APP_APPWRITE_FILES_COLLECTION_ID || 'files';
-const USER_SETTINGS_COLLECTION_ID = process.env.REACT_APP_APPWRITE_USER_SETTINGS_COLLECTION_ID || 'user-settings';
-const USAGE_LIMITS_COLLECTION_ID = process.env.REACT_APP_APPWRITE_USAGE_LIMITS_COLLECTION_ID || 'usage-limits';
-const INVITATIONS_COLLECTION_ID = process.env.REACT_APP_APPWRITE_INVITATIONS_COLLECTION_ID || 'invitations';
-
-
-// A placeholder for your attachments bucket ID.
-// IMPORTANT: Make sure to set this in your .env file.
 const attachmentsBucketId = process.env.REACT_APP_APPWRITE_ATTACHMENTS_BUCKET_ID;
 
 // Service class to handle all Appwrite operations
@@ -36,7 +29,6 @@ class AppwriteService {
         // Create user profile
         await this.createUserProfile(response.$id, name, email);
         
-        // No longer setting default preferences automatically
       }
       
       return response;
@@ -175,41 +167,15 @@ class AppwriteService {
     }
   }
 
-  async incrementUsage(userId, type, amount = 1) {
-    try {
-      const userProfile = await this.getUserProfile(userId);
-      const usageStats = userProfile.usageStats || {};
-      
-      if (type === 'textQueries') {
-        usageStats.textQueries = (usageStats.textQueries || 0) + amount;
-      } else if (type === 'imageGeneration') {
-        usageStats.imageGeneration = (usageStats.imageGeneration || 0) + amount;
-      } else if (type === 'videoGeneration') {
-        usageStats.videoGeneration = (usageStats.videoGeneration || 0) + amount;
-      }
-      
-      return await this.updateUserProfile(userId, { usageStats });
-    } catch (error) {
-      console.error('Error incrementing usage:', error);
-      throw error;
-    }
-  }
+ 
 
-  // User settings methods
-  async createDefaultUserSettings(userId) {
-    try {
-     console.log('Sorry we are not ready for this yet');
-    } catch (error) {
-      console.error('Error creating default user settings:', error);
-      throw error;
-    }
-  }
+
 
   async getUserSettings(userId) {
     try {
       return await databases.getDocument(
         DATABASE_ID,
-        USER_SETTINGS_COLLECTION_ID,
+        USERS_COLLECTION_ID,
         userId
       );
     } catch (error) {
@@ -222,7 +188,7 @@ class AppwriteService {
     try {
       return await databases.updateDocument(
         DATABASE_ID,
-        USER_SETTINGS_COLLECTION_ID,
+        USERS_COLLECTION_ID,
         userId,
         data
       );
@@ -682,67 +648,7 @@ class AppwriteService {
   }
 
   
-  // Invitation methods
-  async createInvitation(threadId, invitedBy, invitedEmail, role = 'viewer') {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        INVITATIONS_COLLECTION_ID,
-        ID.unique(),
-        {
-          threadId,
-          invitedBy,
-          invitedEmail,
-          role,
-          status: 'pending',
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-          acceptedAt: null
-        }
-      );
-    } catch (error) {
-      console.error('Error creating invitation:', error);
-      throw error;
-    }
-  }
-
-  async getInvitations(email) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        INVITATIONS_COLLECTION_ID,
-        [
-          Query.equal('invitedEmail', email),
-          Query.equal('status', 'pending')
-        ]
-      );
-    } catch (error) {
-      console.error('Error getting invitations:', error);
-      throw error;
-    }
-  }
-
-  async updateInvitation(invitationId, status) {
-    try {
-      const data = {
-        status
-      };
-      
-      if (status === 'accepted') {
-        data.acceptedAt = new Date().toISOString();
-      }
-      
-      return await databases.updateDocument(
-        DATABASE_ID,
-        INVITATIONS_COLLECTION_ID,
-        invitationId,
-        data
-      );
-    } catch (error) {
-      console.error('Error updating invitation:', error);
-      throw error;
-    }
-  }
-
+  
 
   async shareThreadPublic(threadId) {
     try {

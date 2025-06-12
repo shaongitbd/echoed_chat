@@ -84,14 +84,8 @@ export const SettingsProvider = ({ children }) => {
         setUserSettings(processedSettings);
       } catch (error) {
         console.error('Error loading user settings:', error);
-        
-        // If settings don't exist, create default settings
-        try {
-          const defaultSettings = await appwriteService.createDefaultUserSettings(user.$id);
-          setUserSettings(defaultSettings);
-        } catch (createError) {
-          console.error('Error creating default user settings:', createError);
-        }
+        // Don't create default settings - let the UI handle the case when settings don't exist
+        setUserSettings(null);
       } finally {
         setIsLoading(false);
       }

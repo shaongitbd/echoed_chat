@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { appwriteService } from '../lib/appwrite';
 import { toast } from 'sonner';
+import InlineModelSelector from '../components/Chat/InlineModelSelector';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -16,6 +17,49 @@ const Home = () => {
   const [input, setInput] = useState('');
   const [isCheckingPreferences, setIsCheckingPreferences] = useState(true);
   const [showPreferencesPrompt, setShowPreferencesPrompt] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState('openai');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o');
+  const [availableModels, setAvailableModels] = useState([]);
+
+  // Create a list of available models from enabled providers in settings
+  useEffect(() => {
+    if (userSettings && userSettings.providers) {
+      const models = [];
+      userSettings.providers.forEach(provider => {
+        if (provider.enabled) {
+          provider.models.forEach(model => {
+            if (model.enabled) {
+              models.push({
+                provider: provider.name,
+                id: model.id,
+                name: model.name,
+                capabilities: model.capabilities || ['text']
+              });
+            }
+          });
+        }
+      });
+      setAvailableModels(models);
+
+      // Set default provider and model from user settings
+      if (userSettings.defaultProvider) {
+        setSelectedProvider(userSettings.defaultProvider);
+      }
+      if (userSettings.defaultModel) {
+        setSelectedModel(userSettings.defaultModel);
+      }
+    }
+  }, [userSettings]);
+
+  const currentModelInfo = useMemo(() => {
+    return availableModels.find(m => m.id === selectedModel && m.provider === selectedProvider);
+  }, [availableModels, selectedProvider, selectedModel]);
+
+  // Handle model selection
+  const handleModelSelect = (provider, model) => {
+    setSelectedProvider(provider);
+    setSelectedModel(model);
+  };
 
   // Check if the user has set their preferences
   useEffect(() => {
@@ -70,9 +114,8 @@ const Home = () => {
       return;
     }
 
-    if (!userSettings?.defaultProvider || !userSettings?.defaultModel) {
-      toast.error('Please set up your default AI model in settings first.');
-      navigate('/model-selection');
+    if (!selectedProvider || !selectedModel) {
+      toast.error('Please select an AI model first.');
       return;
     }
 
@@ -89,8 +132,8 @@ const Home = () => {
       const newThread = await appwriteService.createChatThread(
         user.$id,
         messageContent.substring(0, 50),
-        userSettings.defaultProvider,
-        userSettings.defaultModel
+        selectedProvider,
+        selectedModel
       );
 
       // Add the first message to the thread
@@ -100,8 +143,8 @@ const Home = () => {
         messageContent,
         {
           contentType: 'text',
-          model: userSettings.defaultModel,
-          provider: userSettings.defaultProvider,
+          model: selectedModel,
+          provider: selectedProvider,
         }
       );
 
@@ -230,6 +273,13 @@ const Home = () => {
                 className="flex-1 min-h-[40px] max-h-40 px-3 py-2 border-none focus:outline-none bg-transparent text-base placeholder:text-gray-500 resize-none"
                 rows={1}
               />
+              <div className="mr-2">
+                <InlineModelSelector
+                  currentProvider={selectedProvider}
+                  currentModel={selectedModel}
+                  onSelect={handleModelSelect}
+                />
+              </div>
               <button
                 className={`p-2.5 rounded-lg text-white transition-all duration-200 ${input.trim() ? 'bg-gradient-to-r from-gray-900 to-gray-800 shadow-sm' : 'bg-gray-300'}`}
                 onClick={handleStartChat}
@@ -238,10 +288,13 @@ const Home = () => {
                 <Send size={16} />
               </button>
             </div>
-            <div className="text-center mt-2">
+            <div className="flex justify-between items-center mt-2">
               <p className="text-xs text-gray-500">
                 AI Chat can make mistakes. Consider checking important information.
               </p>
+              <div className="text-xs text-gray-500">
+                Model: {availableModels.find(m => m.id === selectedModel)?.name || selectedModel}
+              </div>
             </div>
           </div>
         </footer>
