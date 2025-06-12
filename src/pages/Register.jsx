@@ -210,6 +210,7 @@ const Register = () => {
                     } rounded-lg shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent sm:text-sm`}
                     placeholder="Create a password"
                     disabled={isLoading}
+                    minLength={8}
                   />
                   {errors.password && (
                     <p className="mt-1 text-sm text-red-600">{errors.password}</p>
@@ -233,6 +234,7 @@ const Register = () => {
                     } rounded-lg shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent sm:text-sm`}
                     placeholder="Confirm your password"
                     disabled={isLoading}
+                    minLength={8}
                   />
                   {errors.confirmPassword && (
                     <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
