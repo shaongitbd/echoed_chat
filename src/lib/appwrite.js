@@ -67,10 +67,34 @@ class AppwriteService {
 
   async updateUserName(name) {
     try {
+      // First update the Appwrite account name
       const user = await account.updateName(name);
-      // Also update the profile document if it exists
-      await this.updateUserProfile(user.$id, { name });
-      return user;
+      
+      // Then update the user profile in our database through the backend
+      const jwt = await this.getJWT();
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/name`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify({
+          name
+        })
+      });
+      
+      const data = await response.json();
+      
+      // Throw error even for 2xx status codes if the response indicates an error
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to update user name');
+      }
+      
+      return {
+        ...user,
+        profile: data
+      };
     } catch (error) {
       console.error('Error updating user name:', error);
       throw new Error(`Failed to update user name: ${error.message}`);
@@ -114,26 +138,46 @@ class AppwriteService {
     }
   }
 
-
+  // Helper method to get JWT token
+  async getJWT() {
+    try {
+      const jwt = await account.createJWT();
+      if (!jwt || !jwt.jwt) {
+        throw new Error('Failed to create JWT token');
+      }
+      return jwt.jwt; // Return the actual JWT string, not the whole object
+    } catch (error) {
+      console.error('Error getting JWT token:', error);
+      throw new Error('Authentication failed. Please log in again.');
+    }
+  }
 
   // User profile methods
   async createUserProfile(userId, name, email) {
     try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        USERS_COLLECTION_ID,
-        userId,
-        {
+      // Get the JWT token from the current session
+      const jwt = await this.getJWT();
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify({
           name,
-          email,
-          plan: 'free',
-          usageStats: {
-            textQueries: 0,
-            imageGeneration: 0,
-            videoGeneration: 0
-          }
-        }
-      );
+          email
+        })
+      });
+      
+      const data = await response.json();
+      
+      // Throw error even for 2xx status codes if the response indicates an error
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to create user profile');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error creating user profile:', error);
       throw error;
@@ -155,21 +199,18 @@ class AppwriteService {
 
   async updateUserProfile(userId, data) {
     try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        USERS_COLLECTION_ID,
-        userId,
-        data
-      );
+      // Only allow updating preferences through the backend
+      if (data.preferences) {
+        return await this.updateUserPreferences(userId, data.preferences);
+      }
+      
+      console.warn('Direct profile updates are not allowed. Use updateUserPreferences instead.');
+      throw new Error('Direct profile updates are not allowed. Use updateUserPreferences instead.');
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
     }
   }
-
- 
-
-
 
   async getUserSettings(userId) {
     try {
@@ -186,12 +227,13 @@ class AppwriteService {
 
   async updateUserSettings(userId, data) {
     try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        USERS_COLLECTION_ID,
-        userId,
-        data
-      );
+      // Only allow updating preferences through the backend
+      if (data.preferences) {
+        return await this.updateUserPreferences(userId, data.preferences);
+      }
+      
+      console.warn('Direct settings updates are not allowed. Use updateUserPreferences instead.');
+      throw new Error('Direct settings updates are not allowed. Use updateUserPreferences instead.');
     } catch (error) {
       console.error('Error updating user settings:', error);
       throw error;
@@ -200,14 +242,28 @@ class AppwriteService {
 
   async updateUserPreferences(userId, preferences) {
     try {
-      // Get current settings
-      const currentSettings = await this.getUserSettings(userId);
+      // Get the JWT token from the current session
+      const jwt = await this.getJWT();
       
-      // Update with new preferences
-      return await this.updateUserSettings(userId, {
-        ...currentSettings,
-        ...preferences
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`
+        },
+        body: JSON.stringify({
+          preferences
+        })
       });
+      
+      const data = await response.json();
+      
+      // Throw error even for 2xx status codes if the response indicates an error
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to update user preferences');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error updating user preferences:', error);
       throw error;
@@ -646,9 +702,6 @@ class AppwriteService {
       throw error;
     }
   }
-
-  
-  
 
   async shareThreadPublic(threadId) {
     try {

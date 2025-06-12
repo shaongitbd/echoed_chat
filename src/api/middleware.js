@@ -1,4 +1,3 @@
-import { handleApiRequest } from './index';
 
 /**
  * Middleware to intercept fetch requests to /api routes
