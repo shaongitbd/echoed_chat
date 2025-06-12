@@ -39,6 +39,7 @@ Follow these steps to set up and run Echoed.chat on your local machine.
 
 Before running the application, you need to set up your Appwrite project.
 
+
 1.  Create a new project on your Appwrite instance.
 2.  Set up the required collections and storage buckets. See our [Appwrite Schema Setup Guide](docs/appwrite-schema.md) for details.
 
@@ -65,6 +66,7 @@ REACT_APP_BACKEND_URL=
 PRICING_COLLECTION_ID=
 REACT_APP_APPWRITE_PRICING_COLLECTION_ID=
 
+```
 #### Backend (`backend/.env`)
 
 Create a `.env` file in your backend directory with the following variables:
