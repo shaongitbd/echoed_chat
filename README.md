@@ -1,62 +1,118 @@
-# AI Chat UI Frontend
+# Echoed.chat: A Unified AI Chat Experience
 
-This is the frontend for the AI Chat Interface application, built with React and integrated with the Vercel AI SDK.
+Echoed.chat is an open-source, feature-rich chat application. It aims to provide a comprehensive and seamless conversational AI experience.
 
-## Vercel AI SDK Integration
+## ✨ Features
 
-This project uses the [Vercel AI SDK](https://www.npmjs.com/package/ai) for handling AI chat interactions. The AI SDK provides:
+- **Authentication & DB Sync:** Secure user authentication and real-time database synchronization with Appwrite.
+- **Text Chat:** Real-time text-based conversations.
+- **Image Generation:** Generate images directly within the chat.
+- **Branching Conversations:** Explore different conversational paths by branching from any message.
+- **Chat Export/Import:** Easily export and import your chat history.
+- **Shareable Chats:** Share your conversations with others via a public link.
+- **User Limit Checker:** Manage and monitor user-based limitations.
 
-- A unified API to interact with multiple LLM providers (OpenAI, Anthropic, Google, etc.)
-- React hooks for building chat interfaces (`useChat`)
-- Streaming responses
-- Multi-modal capabilities (text, image, video)
+### 🚧 Work in Progress
 
-### Key Components
+- **Video Generation:** Upcoming feature for generating videos.
+- **Web Search:** Integrated web search capabilities.
 
-1. **AI SDK Hooks**: We use `useChat` from `@ai-sdk/react` in our Chat component to handle:
-   - Message state management
-   - Input handling
-   - Streaming responses
-   - API communication
+## 🛠️ Tech Stack
 
-2. **Model Providers**: We've integrated multiple model providers:
-   - OpenAI (`@ai-sdk/openai`)
-   - Anthropic (`@ai-sdk/anthropic`)
-   - Google (`@ai-sdk/google`)
+| Category      | Technology                                    |
+|---------------|-----------------------------------------------|
+| **Frontend**  | [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/) |
+| **Backend**   | [Express.js](https://expressjs.com/)          |
+| **BaaS**      | [Appwrite](https://appwrite.io/) (Auth, Database, Storage) |
 
-3. **Model Selection**: The chat interface includes a model selector that allows users to:
-   - Choose from available models across different providers
-   - See model capabilities
-   - Save preferred models per conversation
+## 🚀 Getting Started
 
-4. **API Integration**: The frontend simulates API endpoints for development:
-   - `/api/chat` - Handles chat requests using the AI SDK
-   - Messages are saved to Appwrite after generation
-   - API keys are retrieved from user settings
+Follow these steps to set up and run Echoed.chat on your local machine.
 
-### Usage
+### Prerequisites
 
-To use the AI chat functionality:
+- Node.js
+- npm
+- An Appwrite project
 
-1. Set up your API keys in the user settings for each provider you want to use
-2. Select your preferred provider and model from the dropdown in the chat interface
-3. Start chatting!
+### 1. Appwrite Setup
 
-The app will automatically:
-- Stream responses in real-time
-- Save conversations to Appwrite
-- Support text, image, and video generation based on the selected model's capabilities
+Before running the application, you need to set up your Appwrite project.
 
-## Getting Started
+1.  Create a new project on your Appwrite instance.
+2.  Set up the required collections and storage buckets. **(TODO: Link to Appwrite schema setup guide)**
 
-1. Install dependencies:
-```bash
-npm install
+### 2. Environment Configuration
+
+You'll need to create `.env` files for both the frontend and backend.
+
+#### Frontend (`frontend/.env`)
+
+Create a `.env` file in the `frontend` directory with the following variables:
+
+```
+REACT_APP_APPWRITE_ENDPOINT=
+REACT_APP_APPWRITE_PROJECT_ID=
+REACT_APP_APPWRITE_DATABASE_ID=
+REACT_APP_APPWRITE_USERS_COLLECTION_ID=
+REACT_APP_APPWRITE_THREADS_COLLECTION_ID=
+REACT_APP_APPWRITE_MESSAGES_COLLECTION_ID=
+REACT_APP_APPWRITE_USER_SETTINGS_COLLECTION_ID=
+
+REACT_APP_SEARCH_API_ENDPOINT=
+REACT_APP_APPWRITE_ATTACHMENTS_BUCKET_ID=
+REACT_APP_BACKEND_URL=
+PRICING_COLLECTION_ID=
+REACT_APP_APPWRITE_PRICING_COLLECTION_ID=
+
+#### Backend (`backend/.env`)
+
+Create a `.env` file in your backend directory with the following variables:
+
+```
+APPWRITE_ENDPOINT=
+APPWRITE_PROJECT_ID=
+APPWRITE_API_KEY=
+APPWRITE_DATABASE_ID=
+APPWRITE_PROFILES_COLLECTION_ID=
+APPWRITE_USERS_COLLECTION_ID=
+APPWRITE_PRICING_COLLECTION_ID=
+APPWRITE_CHAT_MESSAGES_COLLECTION_ID=
+APPWRITE_CHAT_THREADS_COLLECTION_ID=
 ```
 
-2. Start the development server:
+### 3. Installation & Running the App
+
+#### Frontend
+
 ```bash
+# Navigate to the frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start the development server
 npm start
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) to view it in your browser. 
+#### Backend
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Install dependencies
+npm install
+
+# Start the server
+npm start
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! If you'd like to contribute to Echoed.chat, please fork the repository and create a pull request. For major changes, please open an issue first to discuss what you would like to change.
+
+## 📝 License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
