@@ -8,7 +8,7 @@ export function setupApiMiddleware() {
   const originalFetch = window.fetch;
   
   // Backend server URL
-  const BACKEND_URL = 'http://localhost:3001';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   
   // Override the fetch function
   window.fetch = async function(url, options = {}) {
