@@ -154,14 +154,7 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
             New Chat
           </button>
           
-          {/* Debug button */}
-          <button
-            onClick={handleDebugUser}
-            className="flex items-center justify-center w-full gap-2 px-3 py-2 mt-2 text-xs font-medium text-gray-300 bg-gray-800 rounded-lg hover:bg-gray-700 focus:outline-none transition-all duration-200"
-            type="button"
-          >
-            Debug User State
-          </button>
+        
         </div>
 
         {/* Chat history */}
