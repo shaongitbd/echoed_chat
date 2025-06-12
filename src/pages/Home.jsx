@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail, Paperclip, FileText, Music, Film } from 'lucide-react';
+import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail, Paperclip, FileText, Music, Film, GitFork, Share2, ArrowRightLeft, Lock } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -295,16 +295,16 @@ const Home = () => {
     }
   };
 
-  const ExamplePrompt = ({ icon, text }) => (
-    <button
-      onClick={handleInputFocus}
-      className="bg-white p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-all duration-200 w-full text-left"
-    >
-      <div className="flex items-center gap-3">
+  const FeatureHighlight = ({ icon, title, description }) => (
+    <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-start gap-4 text-left">
+      <div className="flex-shrink-0 w-8 h-8 mt-1 rounded-full bg-gray-100 flex items-center justify-center">
         {icon}
-        <span className="text-sm font-medium text-gray-700">{text}</span>
       </div>
-    </button>
+      <div>
+        <h4 className="font-semibold text-gray-800">{title}</h4>
+        <p className="text-sm text-gray-600">{description}</p>
+      </div>
+    </div>
   );
 
   // Show loading state while checking preferences
@@ -375,25 +375,42 @@ const Home = () => {
               <Sparkles size={32} className="text-white" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mt-6">
-              How can I help you today?
+              A powerful, multi-modal AI chat experience
             </h2>
+            <p className="text-gray-600 mt-2 max-w-xl mx-auto">
+              Go beyond simple text conversations. Generate images, branch your ideas, collaborate with others, and manage your chat history with ease.
+            </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-              <ExamplePrompt 
-                icon={<MessageSquare size={18} className="text-gray-500" />}
-                text="Explain quantum computing"
+              <FeatureHighlight
+                icon={<MessageSquare size={16} className="text-gray-500" />}
+                title="Advanced Chat"
+                description="Engage in dynamic, multi-turn conversations with a wide range of AI models."
               />
-              <ExamplePrompt 
-                icon={<Code size={18} className="text-gray-500" />}
-                text="Write a Python script for a task"
+              <FeatureHighlight
+                icon={<Image size={16} className="text-gray-500" />}
+                title="Image Generation"
+                description="Bring your ideas to life by generating stunning images from text descriptions."
               />
-              <ExamplePrompt 
-                icon={<PenSquare size={18} className="text-gray-500" />}
-                text="Draft an email for a job application"
+              <FeatureHighlight
+                icon={<GitFork size={16} className="text-gray-500" />}
+                title="Chat Branching"
+                description="Explore different lines of thought by creating branches from any point in a conversation."
               />
-              <ExamplePrompt 
-                icon={<Image size={18} className="text-gray-500" />}
-                text="Create an image of a futuristic city"
+              <FeatureHighlight
+                icon={<Share2 size={16} className="text-gray-500" />}
+                title="Seamless Sharing"
+                description="Share your conversations publicly or invite collaborators to chat with you."
+              />
+              <FeatureHighlight
+                icon={<ArrowRightLeft size={16} className="text-gray-500" />}
+                title="Import & Export"
+                description="Easily move your chat history between different accounts or platforms."
+              />
+              <FeatureHighlight
+                icon={<Lock size={16} className="text-gray-500" />}
+                title="Authentication & DB Sync"
+                description="User authentication enables you to securely store your chats. All conversations are synced to a database associated with your account, accessible anytime, anywhere, on any device."
               />
             </div>
           </div>
