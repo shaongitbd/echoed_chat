@@ -41,7 +41,7 @@ class AppwriteService {
 
   async login(email, password) {
     try {
-      return await account.createEmailSession(email, password);
+      return await account.createEmailPasswordSession(email, password);
     } catch (error) {
       console.error('Error logging in:', error);
       throw error;
