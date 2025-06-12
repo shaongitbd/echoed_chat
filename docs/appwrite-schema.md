@@ -71,4 +71,4 @@ Stores user-specific information.
 | `email`      | String | Yes      | -                                                   | The user's email address.           |
 | `plan`       | String | Yes      | -                                                   | The user's current subscription plan. |
 | `usageStats` | String | No       | `{"textQueries":0,"imageGeneration":0,"videoGeneration":0}` | JSON string tracking user's usage.  |
-| `preferences`| String | No       | -                                                   | JSON string for user preferences.   |
+| `preferences`| String | No       | -                                                   | JSON string for storing models, and their keys    |
