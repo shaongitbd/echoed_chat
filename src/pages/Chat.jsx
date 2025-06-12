@@ -313,16 +313,16 @@ const Chat = () => {
         console.log(`Loaded ${response.documents.length} messages from Appwrite`);
         
         const formattedMessages = response.documents.map(msg => ({
-          id: msg.$id,
-          role: msg.sender === user.$id ? 'user' : 'assistant',
-          content: msg.content,
-          createdAt: msg.$createdAt,
-          saved: true, 
-          contentType: msg.contentType,
-          imagePrompt: msg.imagePrompt,
-          videoPrompt: msg.videoPrompt,
-          model: msg.model,
-          provider: msg.provider,
+  id: msg.$id,
+  role: msg.sender === 'assistant' ? 'assistant' : 'user',
+  content: msg.content,
+  createdAt: msg.$createdAt,
+  saved: true, 
+  contentType: msg.contentType,
+  imagePrompt: msg.imagePrompt,
+  videoPrompt: msg.videoPrompt,
+  model: msg.model,
+  provider: msg.provider,
           // Parse the stringified attachment data from the DB back into objects
           attachments: (msg.attachments || []).map(att => {
             try {
