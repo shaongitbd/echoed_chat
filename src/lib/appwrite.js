@@ -28,7 +28,8 @@ class AppwriteService {
       
       if (response.$id) {
         // Create user profile
-        await this.createUserProfile( name, email);
+        await this.createUserProfile( response.$id, name, email);
+        
         
       }
       
@@ -154,18 +155,19 @@ class AppwriteService {
   }
 
   // User profile methods
-  async createUserProfile( name, email) {
+  async createUserProfile( userId,name, email) {
     try {
-      // Get the JWT token from the current session
+  
       const jwt = await this.getJWT();
-      
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${jwt}`
+         
         },
         body: JSON.stringify({
+          userId,
           name,
           email
         })

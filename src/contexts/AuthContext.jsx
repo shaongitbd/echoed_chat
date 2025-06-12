@@ -59,8 +59,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const newAccount = await appwriteService.createAccount(email, password, name);
       
-      // Auto-login after registration
-      await appwriteService.login(email, password);
+     
       await checkAuth(); // Re-check auth after login
       
       return { success: true };
