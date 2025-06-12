@@ -115,4 +115,4 @@ Contributions are welcome! If you'd like to contribute to Echoed.chat, please fo
 
 ## 📝 License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/). See the `LICENSE` file for details.
