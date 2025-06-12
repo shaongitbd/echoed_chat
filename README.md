@@ -40,7 +40,7 @@ Follow these steps to set up and run Echoed.chat on your local machine.
 Before running the application, you need to set up your Appwrite project.
 
 1.  Create a new project on your Appwrite instance.
-2.  Set up the required collections and storage buckets. **(TODO: Link to Appwrite schema setup guide)**
+2.  Set up the required collections and storage buckets. See our [Appwrite Schema Setup Guide](docs/appwrite-schema.md) for details.
 
 ### 2. Environment Configuration
 
