@@ -28,7 +28,7 @@ class AppwriteService {
       
       if (response.$id) {
         // Create user profile
-        await this.createUserProfile( name, email);
+        await this.createEmailSession( name, email);
         
       }
       
@@ -41,7 +41,7 @@ class AppwriteService {
 
   async login(email, password) {
     try {
-      return await account.createEmailPasswordSession(email, password);
+      return await account.createEmailSession(email, password);
     } catch (error) {
       console.error('Error logging in:', error);
       throw error;
