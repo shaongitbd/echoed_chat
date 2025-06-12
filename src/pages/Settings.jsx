@@ -177,14 +177,14 @@ const ProfileTab = ({ profileForm, handleProfileChange, handleProfileSubmit, for
 );
 
 const UsageTab = ({ handleUpgradeSubscription }) => (
-    <div className="space-y-8">
+    <div className="bg-gray-200 ">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Your Subscription</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2 ">(Work in Progress) Your Subscription</h3>
         <p className="text-sm text-gray-600 mb-6">
           View your current plan and usage limits
         </p>
         
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ">
           {SUBSCRIPTION_TIERS.map((tier) => (
             <div
               key={tier.id}
