@@ -280,7 +280,7 @@ class AppwriteService {
       const threadData = {
         title,
         createdBy: userId,
-        participants: JSON.stringify([userId]),
+        participants: [userId], // Initialize participants array with the creator
         isShared: false,
         shareSettings: JSON.stringify({
           public: false,
@@ -413,7 +413,9 @@ class AppwriteService {
     
     try {
       const cleanUserId = Array.isArray(userId) ? userId[0] : userId;
-      const response = await databases.listDocuments(
+      
+      // First, get threads created by the user
+      const ownedThreads = await databases.listDocuments(
         DATABASE_ID,
         CHAT_THREADS_COLLECTION_ID,
         [
@@ -421,8 +423,67 @@ class AppwriteService {
           Query.orderDesc('$updatedAt'),
         ]
       );
-      console.log('Threads response:', response);
-      return response;
+      
+      // Get all threads that are shared (we'll filter for the current user later)
+      const sharedThreads = await databases.listDocuments(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        [
+          Query.equal('isShared', true),
+          Query.notEqual('createdBy', cleanUserId), // Exclude threads they created (already in ownedThreads)
+          Query.orderDesc('$updatedAt'),
+        ]
+      );
+      
+      // Filter shared threads to only include those where the user is a participant
+      const userSharedThreads = sharedThreads.documents.filter(thread => {
+        // Check if user is in participants
+        if (thread.participants) {
+          // Handle array format
+          if (Array.isArray(thread.participants)) {
+            return thread.participants.includes(cleanUserId);
+          }
+          
+          // Handle string format (JSON array)
+          if (typeof thread.participants === 'string') {
+            try {
+              const parsedParticipants = JSON.parse(thread.participants);
+              return Array.isArray(parsedParticipants) && parsedParticipants.includes(cleanUserId);
+            } catch (e) {
+              console.error('Error parsing participants:', e);
+              return false;
+            }
+          }
+        }
+        
+        // Also check shareSettings as a fallback
+        if (thread.shareSettings) {
+          try {
+            const settings = JSON.parse(thread.shareSettings);
+            if (settings.invitedUsers && Array.isArray(settings.invitedUsers)) {
+              return settings.invitedUsers.some(user => user.userId === cleanUserId);
+            }
+          } catch (e) {
+            console.error('Error parsing shareSettings:', e);
+          }
+        }
+        
+        return false;
+      });
+      
+      // Combine the results
+      const allThreads = {
+        documents: [...ownedThreads.documents, ...userSharedThreads],
+        total: ownedThreads.total + userSharedThreads.length
+      };
+      
+      // Sort combined results by updatedAt (newest first)
+      allThreads.documents.sort((a, b) => {
+        return new Date(b.$updatedAt) - new Date(a.$updatedAt);
+      });
+      
+      console.log(`Found ${ownedThreads.total} owned threads and ${userSharedThreads.length} shared threads`);
+      return allThreads;
     } catch (error) {
       console.error('Error getting user chat threads:', error);
       // Return empty result instead of throwing error to prevent infinite loops
@@ -451,20 +512,34 @@ class AppwriteService {
     try {
       const thread = await this.getChatThread(threadId);
       
-      // Parse existing participants from JSON string
+      // Parse existing participants
       let participants = [];
-      try {
-        participants = JSON.parse(thread.participants || '[]');
-      } catch (e) {
-        console.error('Error parsing participants:', e);
-        participants = [];
+      if (thread.participants) {
+        // Handle both string and array formats
+        if (typeof thread.participants === 'string') {
+          try {
+            participants = JSON.parse(thread.participants);
+          } catch (e) {
+            console.error('Error parsing participants string:', e);
+            participants = [];
+          }
+        } else if (Array.isArray(thread.participants)) {
+          participants = thread.participants;
+        }
+      }
+      
+      // Add the thread creator if not already in participants
+      if (thread.createdBy && !participants.includes(thread.createdBy)) {
+        participants.push(thread.createdBy);
       }
       
       // Create new shareSettings object
       const shareSettings = {
         public: isPublic,
         invitedUsers: users.map(user => ({
+          userId: user.userId,
           email: user.email,
+          name: user.name || '',
           role: user.role || 'viewer'
         }))
       };
@@ -473,11 +548,24 @@ class AppwriteService {
       const newUserIds = users.map(u => u.userId).filter(Boolean);
       const updatedParticipants = [...new Set([...participants, ...newUserIds])];
       
-      return await this.updateChatThread(threadId, {
-        isShared: true,
-        shareSettings: JSON.stringify(shareSettings),
-        participants: JSON.stringify(updatedParticipants)
-      });
+      // Prepare permissions
+      const permissions = [
+        ...(thread.$permissions || []),
+        ...newUserIds.map(userId => Permission.read(Role.user(userId)))
+      ];
+      
+      // Update the thread
+      return await databases.updateDocument(
+        DATABASE_ID,
+        CHAT_THREADS_COLLECTION_ID,
+        threadId,
+        {
+          isShared: true,
+          shareSettings: JSON.stringify(shareSettings),
+          participants: updatedParticipants
+        },
+        permissions
+      );
     } catch (error) {
       console.error('Error sharing chat thread:', error);
       throw error;
@@ -830,28 +918,28 @@ class AppwriteService {
         });
       }
       
-      // Add read permission for this user
-      const permissions = [
-        ...thread.$permissions || [],
-        Permission.read(Role.user(userToShare.$id))
-      ];
+      // Call the backend endpoint to update permissions
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const token = await this.getJWT();
       
-      // Update the thread
-      const response = await databases.updateDocument(
-        DATABASE_ID,
-        CHAT_THREADS_COLLECTION_ID,
-        threadId,
-        {
-          isShared: true,
-          shareSettings: JSON.stringify(shareSettings)
+      const response = await fetch(`${backendUrl}/api/threads/${threadId}/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        permissions
-      );
+        body: JSON.stringify({
+          shareSettings: JSON.stringify(shareSettings),
+          userToShareId: userToShare.$id
+        })
+      });
       
-      // Update all messages to have the same permissions
-      await this.updateMessagePermissions(threadId, permissions);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to share thread');
+      }
       
-      return response;
+      return await response.json();
     } catch (error) {
       console.error('Error sharing thread with user:', error);
       throw error;
@@ -899,43 +987,24 @@ class AppwriteService {
   
   async removeThreadAccess(threadId, userId) {
     try {
-      // Get the thread
-      const thread = await this.getChatThread(threadId);
+      // Call the backend endpoint to remove user access
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+      const token = await this.getJWT();
       
-      // Parse share settings
-      let shareSettings = { public: false, invitedUsers: [] };
-      try {
-        shareSettings = JSON.parse(thread.shareSettings || '{}');
-      } catch (e) {
-        console.error('Error parsing share settings:', e);
+      const response = await fetch(`${backendUrl}/api/threads/${threadId}/share/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove thread access');
       }
       
-      // Remove user from invited users
-      shareSettings.invitedUsers = shareSettings.invitedUsers.filter(
-        user => user.userId !== userId
-      );
-      
-      // Remove read permission for this user
-      const permissions = (thread.$permissions || []).filter(
-        permission => !permission.includes(`user:${userId}`)
-      );
-      
-      // Update the thread
-      const response = await databases.updateDocument(
-        DATABASE_ID,
-        CHAT_THREADS_COLLECTION_ID,
-        threadId,
-        {
-          shareSettings: JSON.stringify(shareSettings),
-          isShared: shareSettings.public || shareSettings.invitedUsers.length > 0
-        },
-        permissions
-      );
-      
-      // Update all messages to have the same permissions
-      await this.updateMessagePermissions(threadId, permissions);
-      
-      return response;
+      return await response.json();
     } catch (error) {
       console.error('Error removing thread access:', error);
       throw error;
@@ -957,6 +1026,65 @@ class AppwriteService {
       return user;
     } catch (error) {
       console.error('Error fetching user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update permissions for all messages in a thread
+   * @param {string} threadId - The thread ID
+   * @param {Array} permissions - The permissions to apply
+   * @returns {Promise<void>}
+   */
+  async updateMessagePermissions(threadId, permissions) {
+    try {
+      // Get all messages for this thread
+      const messages = await databases.listDocuments(
+        DATABASE_ID,
+        MESSAGES_COLLECTION_ID,
+        [Query.equal('threadId', threadId)]
+      );
+      
+      // Update permissions for each message
+      const updatePromises = messages.documents.map(message => 
+        databases.updateDocument(
+          DATABASE_ID,
+          MESSAGES_COLLECTION_ID,
+          message.$id,
+          {}, // No need to update content, just permissions
+          permissions
+        )
+      );
+      
+      await Promise.all(updatePromises);
+      console.log(`Updated permissions for ${messages.documents.length} messages in thread ${threadId}`);
+    } catch (error) {
+      console.error(`Error updating message permissions for thread ${threadId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get pricing plans from the Appwrite database
+   * @returns {Promise<Array>} - Array of pricing plans
+   */
+  async getPricingPlans() {
+    try {
+      const PRICING_COLLECTION_ID = process.env.REACT_APP_APPWRITE_PRICING_COLLECTION_ID || '684ae4820033917267e3';
+      
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        PRICING_COLLECTION_ID
+      );
+      
+      if (!response || !response.documents) {
+        console.warn('No pricing plans found');
+        return [];
+      }
+      
+      return response.documents;
+    } catch (error) {
+      console.error('Error fetching pricing plans:', error);
       throw error;
     }
   }

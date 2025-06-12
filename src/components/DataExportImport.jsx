@@ -65,9 +65,6 @@ const DataExportImport = ({ user }) => {
           shareSettings: typeof thread.shareSettings === 'string' 
             ? JSON.parse(thread.shareSettings) 
             : thread.shareSettings || {},
-          participants: typeof thread.participants === 'string' 
-            ? JSON.parse(thread.participants) 
-            : thread.participants || [],
           lastMessageAt: thread.$updatedAt,
           defaultProvider: thread.defaultProvider,
           defaultModel: thread.defaultModel,

@@ -176,94 +176,243 @@ const ProfileTab = ({ profileForm, handleProfileChange, handleProfileSubmit, for
     </form>
 );
 
-const UsageTab = ({ handleUpgradeSubscription }) => (
-    <div className="bg-gray-200 ">
+const UsageTab = ({ user, handleUpgradeSubscription }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [userPlan, setUserPlan] = useState('free');
+  const [usageData, setUsageData] = useState(null);
+  const [pricingPlans, setPricingPlans] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  useEffect(() => {
+    const fetchUserUsageData = async () => {
+      if (!user || !user.$id) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Get user profile to access usage stats and plan
+        const userProfile = await appwriteService.getUserProfile(user.$id);
+        
+        if (!userProfile) {
+          setErrorMessage('Could not retrieve user profile');
+          return;
+        }
+        
+        // Get the user's plan
+        const plan = userProfile.plan || 'free';
+        setUserPlan(plan);
+        
+        // Parse usage stats
+        let usageStats = { textQueries: 0, imageGeneration: 0, videoGeneration: 0 };
+        
+        if (userProfile.usageStats) {
+          if (typeof userProfile.usageStats === 'string') {
+            try {
+              usageStats = JSON.parse(userProfile.usageStats);
+            } catch (e) {
+              console.error('Error parsing usageStats:', e);
+            }
+          } else {
+            usageStats = userProfile.usageStats;
+          }
+        }
+        
+        setUsageData(usageStats);
+        
+        // Fetch pricing plans from Appwrite to get limits
+        const allPricingPlans = await appwriteService.getPricingPlans();
+        
+        if (allPricingPlans && allPricingPlans.length > 0) {
+          // Transform pricing plans into the format needed for display
+          const formattedPlans = allPricingPlans.map(planData => {
+            const isCurrent = planData.package_name === plan;
+            
+            return {
+              id: planData.package_name,
+              name: planData.display_name || planData.package_name.charAt(0).toUpperCase() + planData.package_name.slice(1),
+              price: planData.price_display || ( planData.price_monthly + '/month'),
+              description: planData.description || '',
+              features: [
+                { 
+                  name: 'Text Queries', 
+                  limit: planData.text_credit || 0, 
+                  used: isCurrent ? usageStats.textQueries || 0 : 0 
+                },
+                { 
+                  name: 'Image Generation', 
+                  limit: planData.image_credit || 0, 
+                  used: isCurrent ? usageStats.imageGeneration || 0 : 0 
+                },
+                { 
+                  name: 'Video Generation', 
+                  limit: planData.video_credit || 0, 
+                  used: isCurrent ? usageStats.videoGeneration || 0 : 0 
+                }
+              ],
+              current: isCurrent
+            };
+          });
+          
+          setPricingPlans(formattedPlans);
+        } else {
+          // If no pricing plans are found, use the mock data as fallback
+          setPricingPlans(SUBSCRIPTION_TIERS);
+        }
+      } catch (error) {
+        console.error('Error fetching usage data:', error);
+        setErrorMessage('Failed to load usage data');
+        // Fallback to mock data
+        setPricingPlans(SUBSCRIPTION_TIERS);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUserUsageData();
+  }, [user]);
+  
+  // Calculate when limits will reset (typically end of month)
+  const getResetDate = () => {
+    const now = new Date();
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const resetDate = new Date(now.getFullYear(), now.getMonth(), lastDayOfMonth);
+    
+    return resetDate.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+  
+  // Calculate usage percentage for the notice
+  const calculateUsagePercentage = () => {
+    if (!usageData || !pricingPlans.length) return 0;
+    
+    const currentPlan = pricingPlans.find(plan => plan.current);
+    if (!currentPlan) return 0;
+    
+    const textFeature = currentPlan.features.find(f => f.name === 'Text Queries');
+    if (!textFeature || textFeature.limit === 0) return 0;
+    
+    return Math.round((textFeature.used / textFeature.limit) * 100);
+  };
+  
+  return (
+    <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2 ">(Work in Progress) Your Subscription</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Your Subscription</h3>
         <p className="text-sm text-gray-600 mb-6">
           View your current plan and usage limits
         </p>
         
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ">
-          {SUBSCRIPTION_TIERS.map((tier) => (
-            <div
-              key={tier.id}
-              className={`rounded-lg shadow-sm overflow-hidden border ${
-                tier.current
-                  ? 'border-gray-900 ring-2 ring-gray-900'
-                  : 'border-gray-200'
-              }`}
-            >
-              <div className="p-5">
-                <h3 className="text-lg font-medium text-gray-900">{tier.name}</h3>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{tier.price}</p>
-                <p className="mt-2 text-sm text-gray-500">{tier.description}</p>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          </div>
+        ) : errorMessage ? (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-red-400" />
               </div>
-              
-              <div className="px-5 pt-4 pb-5">
-                <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide mb-4">
-                  Usage Limits
-                </h4>
-                <ul className="space-y-4">
-                  {tier.features.map((feature) => (
-                    <li key={feature.name} className="flex flex-col">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium text-gray-700">{feature.name}</span>
-                        <span className="text-gray-500">
-                          {tier.current ? `${feature.used} / ${feature.limit}` : feature.limit}
-                        </span>
-                      </div>
-                      {tier.current && (
-                        <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                          <div
-                            className="bg-gray-900 h-2 rounded-full"
-                            style={{ width: `${(feature.used / feature.limit) * 100}%` }}
-                          ></div>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{errorMessage}</p>
+                </div>
               </div>
-              
-              <div className="px-5 py-4 bg-gray-50 border-t border-gray-200">
-                {tier.current ? (
-                  <div className="flex items-center text-sm font-medium text-gray-900">
-                    <CheckCircle className="h-4 w-4 text-gray-900 mr-2" />
-                    Current Plan
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {pricingPlans.map((tier) => (
+                <div
+                  key={tier.id}
+                  className={`rounded-lg shadow-sm overflow-hidden border ${
+                    tier.current
+                      ? 'border-gray-900 ring-2 ring-gray-900'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  <div className="p-5">
+                    <h3 className="text-lg font-medium text-gray-900">{tier.name}</h3>
+                    <p className="mt-1 text-2xl font-semibold text-gray-900">${tier.price}</p>
+                    <p className="mt-2 text-sm text-gray-500">{tier.description}</p>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleUpgradeSubscription(tier.id)}
-                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  >
-                    Upgrade
-                  </button>
-                )}
+                  
+                  <div className="px-5 pt-4 pb-5">
+                    <h4 className="text-xs font-medium text-gray-900 uppercase tracking-wide mb-4">
+                      Usage Limits
+                    </h4>
+                    <ul className="space-y-4">
+                      {tier.features.map((feature) => (
+                        <li key={feature.name} className="flex flex-col">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium text-gray-700">{feature.name}</span>
+                            <span className="text-gray-500">
+                              {tier.current ? `${feature.used} / ${feature.limit}` : feature.limit}
+                            </span>
+                          </div>
+                          {tier.current && (
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  feature.used / feature.limit > 0.9 ? 'bg-red-500' : 
+                                  feature.used / feature.limit > 0.7 ? 'bg-yellow-500' : 
+                                  'bg-gray-900'
+                                }`}
+                                style={{ width: `${Math.min((feature.used / feature.limit) * 100, 100)}%` }}
+                              ></div>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+                  <div className="px-5 py-4 bg-gray-50 border-t border-gray-200">
+                    {tier.current ? (
+                      <div className="flex items-center text-sm font-medium text-gray-900">
+                        <CheckCircle className="h-4 w-4 text-gray-900 mr-2" />
+                        Current Plan
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleUpgradeSubscription(tier.id)}
+                        className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                      >
+                        Upgrade
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mt-6">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">Usage Notice</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>
+                      You have used {calculateUsagePercentage()}% of your monthly text queries. 
+                      Your limits will reset on {getResetDate()}.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-      
-      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <AlertCircle className="h-5 w-5 text-yellow-400" />
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800">Usage Notice</h3>
-            <div className="mt-2 text-sm text-yellow-700">
-              <p>
-                You have used 40% of your monthly text queries. Your limits will reset on June 30, 2023.
-              </p>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
-);
+  );
+};
 
 const ProvidersTab = ({ user, handleEditProviders }) => {
     // Get user settings for providers
@@ -574,7 +723,7 @@ const Settings = () => {
             logout={logout}
         />;
       case 'usage':
-        return <UsageTab handleUpgradeSubscription={handleUpgradeSubscription} />;
+        return <UsageTab user={user} handleUpgradeSubscription={handleUpgradeSubscription} />;
       case 'providers':
         return <ProvidersTab user={user} handleEditProviders={handleEditProviders} />;
       case 'data':
