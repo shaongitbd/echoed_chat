@@ -24,10 +24,11 @@ class AppwriteService {
   async createAccount(email, password, name) {
     try {
       const response = await account.create(ID.unique(), email, password, name);
+      await account.createEmailPasswordSession(email, password);
       
       if (response.$id) {
         // Create user profile
-        await this.createUserProfile(response.$id, name, email);
+        await this.createUserProfile( name, email);
         
       }
       
@@ -153,7 +154,7 @@ class AppwriteService {
   }
 
   // User profile methods
-  async createUserProfile(userId, name, email) {
+  async createUserProfile( name, email) {
     try {
       // Get the JWT token from the current session
       const jwt = await this.getJWT();
