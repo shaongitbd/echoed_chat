@@ -1226,44 +1226,62 @@ const Chat = () => {
                 key={message.id}
                 className={`mb-6 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex max-w-3xl ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
-                    message.role === 'user' ? 'bg-gray-900 text-white ml-2' : 'bg-gray-100 text-gray-600 mr-2'
-                  }`}>
-                    {message.role === 'user' ? (
-                      <User size={16} />
-                    ) : (
-                      <Bot size={16} />
-                    )}
+                <div className={`flex flex-col max-w-3xl group ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                      message.role === 'user' ? 'bg-gray-900 text-white ml-2' : 'bg-gray-100 text-gray-600 mr-2'
+                    }`}>
+                      {message.role === 'user' ? (
+                        <User size={16} />
+                      ) : (
+                        <Bot size={16} />
+                      )}
+                    </div>
+                    
+                    <div className={`px-4 py-3 rounded-lg prose prose-sm max-w-none relative ${
+                      message.role === 'user'
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {renderMessageContent(message)}
+                      {/* User message actions moved to below the message */}
+                    </div>
                   </div>
                   
-                  <div className={`px-4 py-3 rounded-lg prose prose-sm max-w-none relative group ${
-                    message.role === 'user'
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {renderMessageContent(message)}
-                    {message.role === 'user' && (
-                      <div className="absolute top-1 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 p-1 rounded-md">
-                        <button 
+                  {/* User message actions - now placed directly under the message bubble, visible on hover */}
+                  {message.role === 'user' && (
+                    <div className="mt-2 flex justify-end pr-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center bg-gray-100 rounded-md px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(typeof message.content === 'string' ? message.content : '');
+                            toast.success('Message copied to clipboard');
+                          }}
+                          className="p-1 hover:bg-gray-200 rounded text-gray-700"
+                          title="Copy text"
+                        >
+                          <Copy size={15} />
+                        </button>
+                        <button
                           type="button"
                           onClick={() => handleEdit(message)}
-                          className="p-1 hover:bg-gray-700 rounded text-white"
+                          className="p-1 hover:bg-gray-200 rounded text-gray-700 ml-2"
                           title="Edit message"
                         >
-                          <Edit size={14} />
+                          <Edit size={15} />
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => handleDelete(message.id)}
-                          className="p-1 hover:bg-gray-700 rounded text-white"
+                          className="p-1 hover:bg-gray-200 rounded text-gray-700 ml-2"
                           title="Delete message"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
