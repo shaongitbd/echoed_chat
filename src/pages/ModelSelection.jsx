@@ -4,6 +4,13 @@ import { Check, ChevronDown, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { PROVIDERS } from '../lib/providers';
+import { generateText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createMistral } from '@ai-sdk/mistral';
+import { appwriteService } from '../lib/appwrite';
+import Sidebar from '../components/Sidebar';
 
 const ModelSelection = () => {
   const navigate = useNavigate();
@@ -11,16 +18,14 @@ const ModelSelection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testResults, setTestResults] = useState({});
+  const [isInitialized, setIsInitialized] = useState(false);
   
-  // Selected providers and models
+  // Selected providers and models - initialize with nothing selected by default
   const [selectedProviders, setSelectedProviders] = useState({
     openai: {
-      selected: true,
+      selected: false,
       apiKey: '',
-      models: {
-        'gpt-4o': true,
-        'gpt-3.5-turbo': true
-      }
+      models: {}
     },
     anthropic: {
       selected: false,
@@ -38,6 +43,79 @@ const ModelSelection = () => {
       models: {}
     }
   });
+  
+  // Load user preferences on component mount
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (user && user.$id && !isInitialized) {
+        try {
+          setIsLoading(true);
+          console.log('Loading user preferences for user:', user.$id);
+          
+          // Get the full user profile from the database
+          const userProfile = await appwriteService.getUserProfile(user.$id);
+          console.log('User profile loaded:', userProfile);
+          
+          // Check if user has preferences
+          if (userProfile && userProfile.preferences) {
+            let userPrefs;
+            
+            // Parse preferences if it's a string
+            if (typeof userProfile.preferences === 'string') {
+              userPrefs = JSON.parse(userProfile.preferences);
+            } else {
+              userPrefs = userProfile.preferences;
+            }
+            
+            console.log('Parsed user preferences:', userPrefs);
+            
+            if (userPrefs && userPrefs.providers) {
+              const newSelectedProviders = { ...selectedProviders };
+              
+              // Process each provider from user preferences
+              userPrefs.providers.forEach(provider => {
+                if (newSelectedProviders[provider.name]) {
+                  console.log(`Setting up provider ${provider.name}`);
+                  
+                  // Update provider selection and API key
+                  newSelectedProviders[provider.name].selected = provider.enabled;
+                  newSelectedProviders[provider.name].apiKey = provider.apiKey || '';
+                  
+                  // Reset models
+                  newSelectedProviders[provider.name].models = {};
+                  
+                  // Set selected models
+                  if (provider.models && Array.isArray(provider.models)) {
+                    provider.models.forEach(model => {
+                      if (model.enabled) {
+                        console.log(`Enabling model ${model.id} for ${provider.name}`);
+                        newSelectedProviders[provider.name].models[model.id] = true;
+                      }
+                    });
+                  }
+                }
+              });
+              
+              console.log('Setting selected providers state:', newSelectedProviders);
+              setSelectedProviders(newSelectedProviders);
+            }
+          } else {
+            // If no preferences found, don't select anything by default
+            console.log('No preferences found, leaving all providers unselected');
+          }
+          
+          setIsInitialized(true);
+        } catch (error) {
+          console.error('Error loading user preferences:', error);
+          toast.error('Failed to load your preferences');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    loadUserPreferences();
+  }, [user, isInitialized]);
   
   // Handle provider selection toggle
   const toggleProvider = (providerId) => {
@@ -81,7 +159,7 @@ const ModelSelection = () => {
     }));
   };
   
-  // Test API key
+  // Test API key directly using AI SDK
   const testApiKey = async (providerId) => {
     setIsTesting(providerId);
     
@@ -94,32 +172,70 @@ const ModelSelection = () => {
         return;
       }
       
-      // Test the API key by making a simple request to the provider's API
-      const response = await fetch('/api/test-key', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          provider: providerId,
-          apiKey: apiKey
-        }),
-      });
+      let isValid = false;
       
-      const result = await response.json();
+      // Test the API key directly using AI SDK
+      try {
+        switch (providerId) {
+          case 'openai':
+            // Test OpenAI API key with a simple models list request
+            const openaiProvider = createOpenAI({ apiKey });
+            await openaiProvider.listModels();
+            isValid = true;
+            break;
+            
+          case 'anthropic':
+            // Test Anthropic API key with a simple completion request
+            const anthropicProvider = createAnthropic({ apiKey });
+            const anthropicModel = anthropicProvider('claude-3-haiku-20240307');
+            await generateText({
+              model: anthropicModel,
+              prompt: 'Hello',
+              maxTokens: 1,
+            });
+            isValid = true;
+            break;
+            
+          case 'google':
+            // Test Google API key with a simple text generation
+            const googleProvider = createGoogleGenerativeAI({ apiKey });
+            const googleModel = googleProvider('gemini-1.5-flash');
+            await generateText({
+              model: googleModel,
+              prompt: 'Hello',
+              maxTokens: 1,
+            });
+            isValid = true;
+            break;
+            
+          case 'mistral':
+            // Test Mistral API key with a simple completion request
+            const mistralProvider = createMistral({ apiKey });
+            const mistralModel = mistralProvider('mistral-tiny');
+            await generateText({
+              model: mistralModel,
+              prompt: 'Hello',
+              maxTokens: 1,
+            });
+            isValid = true;
+            break;
+            
+          default:
+            toast.error(`Unsupported provider: ${providerId}`);
+        }
+      } catch (testError) {
+        console.error(`Error testing ${providerId} API key:`, testError);
+        toast.error(`Invalid ${getProviderName(providerId)} API key: ${testError.message || 'Unknown error'}`);
+        isValid = false;
+      }
       
-      if (result.valid) {
-        setTestResults(prev => ({
-          ...prev,
-          [providerId]: true
-        }));
+      setTestResults(prev => ({
+        ...prev,
+        [providerId]: isValid
+      }));
+      
+      if (isValid) {
         toast.success(`${getProviderName(providerId)} API key is valid`);
-      } else {
-        setTestResults(prev => ({
-          ...prev,
-          [providerId]: false
-        }));
-        toast.error(`Invalid ${getProviderName(providerId)} API key: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error testing API key:', error);
@@ -177,6 +293,7 @@ const ModelSelection = () => {
       // Validate that at least one provider and model is selected
       if (providers.length === 0) {
         toast.error('Please select at least one provider');
+        setIsLoading(false);
         return;
       }
       
@@ -184,6 +301,7 @@ const ModelSelection = () => {
       
       if (!hasModels) {
         toast.error('Please select at least one model');
+        setIsLoading(false);
         return;
       }
       
@@ -195,6 +313,20 @@ const ModelSelection = () => {
       if (missingKeys.length > 0) {
         const missingProviders = missingKeys.map(p => getProviderName(p.name)).join(', ');
         toast.error(`Please provide API keys for: ${missingProviders}`);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Check if API keys have been tested and are valid
+      const untestedKeys = providers.filter(
+        provider => PROVIDERS.find(p => p.id === provider.name).requiresKey && 
+                    testResults[provider.name] !== true
+      );
+      
+      if (untestedKeys.length > 0) {
+        const untestedProviders = untestedKeys.map(p => getProviderName(p.name)).join(', ');
+        toast.error(`Please test the API keys for: ${untestedProviders}`);
+        setIsLoading(false);
         return;
       }
       
@@ -202,12 +334,16 @@ const ModelSelection = () => {
       const defaultProvider = providers[0].name;
       const defaultModel = providers[0].models[0].id;
       
-      // Save preferences to user account
-      await updateUserPreferences({
+      const preferences = {
         providers,
         defaultProvider,
         defaultModel
-      });
+      };
+      
+      console.log('Saving preferences:', preferences);
+      
+      // Save preferences to user account
+      await updateUserPreferences(preferences);
       
       toast.success('Preferences saved successfully');
       navigate('/chat'); // Redirect to chat page
@@ -258,145 +394,150 @@ const ModelSelection = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Choose Your AI Models</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Select which AI providers and models you'd like to use
-          </p>
-        </div>
-        
-        <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
-          <div className="p-6">
-            <div className="space-y-8">
-              {PROVIDERS.map((provider) => (
-                <div key={provider.id} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id={`provider-${provider.id}`}
-                        checked={selectedProviders[provider.id]?.selected || false}
-                        onChange={() => toggleProvider(provider.id)}
-                        className="h-4 w-4 text-gray-900 focus:ring-gray-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor={`provider-${provider.id}`} className="ml-3 block text-lg font-medium text-gray-900">
-                        {provider.name}
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {selectedProviders[provider.id]?.selected && (
-                    <div className="ml-7 space-y-4">
-                      <p className="text-sm text-gray-500">{provider.description}</p>
-                      
-                      {provider.requiresKey && (
-                        <div>
-                          <label htmlFor={`apikey-${provider.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            API Key
-                          </label>
-                          <div className="flex items-center">
-                            <input
-                              type="password"
-                              id={`apikey-${provider.id}`}
-                              value={selectedProviders[provider.id]?.apiKey || ''}
-                              onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
-                              placeholder={`Enter your ${provider.name} API key`}
-                              className="shadow-sm focus:ring-gray-500 focus:border-gray-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => testApiKey(provider.id)}
-                              disabled={!selectedProviders[provider.id]?.apiKey || isTesting === provider.id}
-                              className="ml-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                            >
-                              {isTesting === provider.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                'Test'
-                              )}
-                            </button>
-                          </div>
-                          {testResults[provider.id] === true && (
-                            <p className="mt-1 text-sm text-green-600 flex items-center">
-                              <Check className="h-4 w-4 mr-1" />
-                              API key is valid
-                            </p>
-                          )}
-                          {testResults[provider.id] === false && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              Invalid API key
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Available Models</h4>
-                        <div className="space-y-2">
-                          {provider.models.map((model) => (
-                            <div key={model.id} className="flex items-start">
-                              <input
-                                type="checkbox"
-                                id={`model-${provider.id}-${model.id}`}
-                                checked={selectedProviders[provider.id]?.models?.[model.id] || false}
-                                onChange={() => toggleModel(provider.id, model.id)}
-                                className="h-4 w-4 text-gray-900 focus:ring-gray-500 border-gray-300 rounded mt-1"
-                              />
-                              <div className="ml-3">
-                                <label htmlFor={`model-${provider.id}-${model.id}`} className="block text-sm font-medium text-gray-900">
-                                  {model.name}
-                                </label>
-                                <p className="text-xs text-gray-500">{model.description}</p>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {model.capabilities.map((capability) => (
-                                    <span
-                                      key={capability}
-                                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
-                                    >
-                                      {capability}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+    <div className="flex h-screen bg-gray-50 font-sans">
+      {/* Sidebar */}
+      <Sidebar />
+      
+      <div className="flex-1 overflow-auto py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Choose Your AI Models</h1>
+            <p className="mt-2 text-lg text-gray-600">
+              Select which AI providers and models you'd like to use
+            </p>
+          </div>
+          
+          <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+            <div className="p-6">
+              <div className="space-y-8">
+                {PROVIDERS.map((provider) => (
+                  <div key={provider.id} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`provider-${provider.id}`}
+                          checked={selectedProviders[provider.id]?.selected || false}
+                          onChange={() => toggleProvider(provider.id)}
+                          className="h-4 w-4 text-gray-900 focus:ring-gray-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor={`provider-${provider.id}`} className="ml-3 block text-lg font-medium text-gray-900">
+                          {provider.name}
+                        </label>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    
+                    {selectedProviders[provider.id]?.selected && (
+                      <div className="ml-7 space-y-4">
+                        <p className="text-sm text-gray-500">{provider.description}</p>
+                        
+                        {provider.requiresKey && (
+                          <div>
+                            <label htmlFor={`apikey-${provider.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                              API Key
+                            </label>
+                            <div className="flex items-center">
+                              <input
+                                type="password"
+                                id={`apikey-${provider.id}`}
+                                value={selectedProviders[provider.id]?.apiKey || ''}
+                                onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
+                                placeholder={`Enter your ${provider.name} API key`}
+                                className="shadow-sm focus:ring-gray-500 focus:border-gray-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => testApiKey(provider.id)}
+                                disabled={!selectedProviders[provider.id]?.apiKey || isTesting === provider.id}
+                                className="ml-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                              >
+                                {isTesting === provider.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  'Test'
+                                )}
+                              </button>
+                            </div>
+                            {testResults[provider.id] === true && (
+                              <p className="mt-1 text-sm text-green-600 flex items-center">
+                                <Check className="h-4 w-4 mr-1" />
+                                API key is valid
+                              </p>
+                            )}
+                            {testResults[provider.id] === false && (
+                              <p className="mt-1 text-sm text-red-600 flex items-center">
+                                <AlertCircle className="h-4 w-4 mr-1" />
+                                Invalid API key
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Available Models</h4>
+                          <div className="space-y-2">
+                            {provider.models.map((model) => (
+                              <div key={model.id} className="flex items-start">
+                                <input
+                                  type="checkbox"
+                                  id={`model-${provider.id}-${model.id}`}
+                                  checked={selectedProviders[provider.id]?.models?.[model.id] || false}
+                                  onChange={() => toggleModel(provider.id, model.id)}
+                                  className="h-4 w-4 text-gray-900 focus:ring-gray-500 border-gray-300 rounded mt-1"
+                                />
+                                <div className="ml-3">
+                                  <label htmlFor={`model-${provider.id}-${model.id}`} className="block text-sm font-medium text-gray-900">
+                                    {model.name}
+                                  </label>
+                                  <p className="text-xs text-gray-500">{model.description}</p>
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {model.capabilities.map((capability) => (
+                                      <span
+                                        key={capability}
+                                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
+                                      >
+                                        {capability}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={handleSkip}
-            className="text-gray-700 font-medium hover:text-gray-900"
-          >
-            Skip for now
-          </button>
           
-          <button
-            type="button"
-            onClick={handleSaveAndContinue}
-            disabled={isLoading}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save & Continue'
-            )}
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="text-gray-700 font-medium hover:text-gray-900"
+            >
+              Skip for now
+            </button>
+            
+            <button
+              type="button"
+              onClick={handleSaveAndContinue}
+              disabled={isLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save & Continue'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

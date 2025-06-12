@@ -62,6 +62,7 @@ const InlineModelSelector = ({ currentProvider, currentModel, onSelect }) => {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm font-medium transition-colors border border-gray-200"
       >
@@ -80,6 +81,7 @@ const InlineModelSelector = ({ currentProvider, currentModel, onSelect }) => {
             ) : (
               enabledModels.map((item, index) => (
                 <button
+                  type="button"
                   key={index}
                   onClick={() => {
                     onSelect(item.providerId, item.modelId);

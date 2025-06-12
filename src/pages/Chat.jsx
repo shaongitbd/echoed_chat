@@ -777,6 +777,7 @@ const Chat = () => {
         {message.role === 'assistant' && (
           <div className="absolute bottom-[-60px] left-0 flex flex-nowrap items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600">
             <button
+              type="button"
               onClick={() => {
                 navigator.clipboard.writeText(textParts);
                 toast.success('Message copied to clipboard');
@@ -787,6 +788,7 @@ const Chat = () => {
               <Copy size={15} />
             </button>
             <button
+              type="button"
               onClick={() => handleBranch(message.id)}
               className="p-1 hover:bg-gray-100 rounded"
               title="Branch conversation"
@@ -794,6 +796,7 @@ const Chat = () => {
               <GitFork size={15} />
             </button>
             <button
+              type="button"
               onClick={() => handleRegenerate(message.id)}
               className="p-1 hover:bg-gray-100 rounded"
               title="Regenerate response"
@@ -816,6 +819,7 @@ const Chat = () => {
               {messageBranches.map(branch => (
                 <li key={branch.$id}>
                   <button
+                    type="button"
                     onClick={() => navigate(`/chat/${branch.$id}`)}
                     className="w-full text-left p-1.5 rounded-md hover:bg-gray-200 transition-colors"
                   >
@@ -994,6 +998,7 @@ const Chat = () => {
             {/* Share button - only show if thread exists */}
             {thread && (
               <button
+                type="button"
                 onClick={() => setShowShareModal(true)}
                 className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm"
                 title="Share this chat"
@@ -1005,6 +1010,7 @@ const Chat = () => {
             
             {/* Model selector button */}
             <button
+              type="button"
               onClick={() => setShowModelSelector(!showModelSelector)}
               className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm"
             >
@@ -1021,6 +1027,7 @@ const Chat = () => {
                 {availableModels.map((model, index) => (
                   <button
                     key={index}
+                    type="button"
                     onClick={() => handleModelSelect(model.provider, model.id)}
                     className={`w-full text-left p-2 rounded-md mb-1 hover:bg-gray-100 ${
                       selectedProvider === model.provider && selectedModel === model.id
@@ -1086,6 +1093,7 @@ const Chat = () => {
                     {message.role === 'user' && (
                       <div className="absolute top-1 right-1 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 p-1 rounded-md">
                         <button 
+                          type="button"
                           onClick={() => handleEdit(message)}
                           className="p-1 hover:bg-gray-700 rounded text-white"
                           title="Edit message"
@@ -1093,6 +1101,7 @@ const Chat = () => {
                           <Edit size={14} />
                         </button>
                         <button 
+                          type="button"
                           onClick={() => handleDelete(message.id)}
                           className="p-1 hover:bg-gray-700 rounded text-white"
                           title="Delete message"
@@ -1133,6 +1142,7 @@ const Chat = () => {
                   </p>
                   <p>{error?.message || 'Failed to get a response. Please check your connection or API key and try again.'}</p>
                   <button
+                    type="button"
                     onClick={() => reload()}
                     className="mt-2 text-xs font-semibold text-red-700 hover:underline"
                   >
