@@ -24,11 +24,11 @@ class AppwriteService {
   async createAccount(email, password, name) {
     try {
       const response = await account.create(ID.unique(), email, password, name);
-      await account.createEmailPasswordSession(email, password);
+      await account.createEmailSession(email, password);
       
       if (response.$id) {
         // Create user profile
-        await this.createEmailSession( name, email);
+        await this.createUserProfile( name, email);
         
       }
       
