@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import { useSettings } from '../../contexts/SettingsContext';
 
-const InlineModelSelector = ({ currentProvider, currentModel, onSelect }) => {
-  const { userSettings } = useSettings();
+const InlineModelSelector = ({ currentProvider, currentModel, onSelect, models = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [enabledModels, setEnabledModels] = useState([]);
   const dropdownRef = useRef(null);
   
   // Close dropdown when clicking outside
@@ -22,38 +19,14 @@ const InlineModelSelector = ({ currentProvider, currentModel, onSelect }) => {
     };
   }, []);
   
-  // Get enabled models from user settings
-  useEffect(() => {
-    if (userSettings && userSettings.providers) {
-      const models = [];
-      
-      userSettings.providers.forEach(provider => {
-        if (provider.enabled) {
-          provider.models.forEach(model => {
-            if (model.enabled && model.capabilities?.includes('text')) {
-              models.push({
-                provider: provider.name,
-                providerId: provider.name,
-                model: model.name,
-                modelId: model.id
-              });
-            }
-          });
-        }
-      });
-      
-      setEnabledModels(models);
-    }
-  }, [userSettings]);
-  
   // Get current model display name
   const getCurrentModelDisplay = () => {
-    const current = enabledModels.find(
-      m => m.providerId.toLowerCase() === currentProvider.toLowerCase() && m.modelId === currentModel
+    const current = models.find(
+      m => m.provider.toLowerCase() === currentProvider.toLowerCase() && m.id === currentModel
     );
     
     if (current) {
-      return `${current.model}`;
+      return `${current.name}`;
     }
     
     return 'Select Model';
@@ -76,28 +49,28 @@ const InlineModelSelector = ({ currentProvider, currentModel, onSelect }) => {
             <div className="mb-2 px-2 py-1 text-xs font-medium text-gray-500 uppercase">
               Select Model
             </div>
-            {enabledModels.length === 0 ? (
-              <div className="text-sm text-gray-500 p-2">No enabled models found</div>
+            {models.length === 0 ? (
+              <div className="text-sm text-gray-500 p-2">No available models</div>
             ) : (
-              enabledModels.map((item, index) => (
+              models.map((item, index) => (
                 <button
                   type="button"
                   key={index}
                   onClick={() => {
-                    onSelect(item.providerId, item.modelId);
+                    onSelect(item.provider, item.id);
                     setIsOpen(false);
                   }}
                   className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors ${
-                    currentProvider.toLowerCase() === item.providerId.toLowerCase() && currentModel === item.modelId
+                    currentProvider.toLowerCase() === item.provider.toLowerCase() && currentModel === item.id
                       ? 'bg-blue-500 text-white'
                       : 'hover:bg-gray-100'
                   }`}
                 >
                   <div>
-                    <div className="text-sm font-medium">{item.model}</div>
+                    <div className="text-sm font-medium">{item.name}</div>
                     <div className="text-xs text-gray-500">{item.provider}</div>
                   </div>
-                  {currentProvider === item.providerId && currentModel === item.modelId && (
+                  {currentProvider === item.provider && currentModel === item.id && (
                     <Check size={16} />
                   )}
                 </button>

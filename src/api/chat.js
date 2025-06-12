@@ -1,4 +1,4 @@
-import { streamText } from 'ai';
+import { streamText, experimental_generateImage as generateImage, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -19,8 +19,113 @@ export async function handleChatRequest(req) {
       model = 'gpt-4o',
       isEdit = false,
       modelCapabilities = [],
+      intent, // 'chat' or 'image'
+      prompt, // for image generation
     } = req.body;
     
+    // --- IMAGE GENERATION INTENT ---
+    if (intent === 'image') {
+      console.log('Handling image generation request with provider:', provider);
+
+      if (!prompt) {
+        return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
+      }
+
+      let apiKey = '';
+      if (userId) {
+        try {
+          const userProfile = await appwriteService.getUserProfile(userId);
+          if (userProfile && userProfile.preferences && typeof userProfile.preferences === 'string') {
+            const preferences = JSON.parse(userProfile.preferences);
+            const providerSettings = preferences.providers?.find(p => p.name === provider);
+            if (providerSettings && providerSettings.apiKey) {
+              apiKey = providerSettings.apiKey;
+            }
+          }
+        } catch (error) {
+          console.error('Error getting API key:', error);
+        }
+      }
+
+      if (!apiKey) {
+        return new Response(
+          JSON.stringify({ error: `No API key found for ${provider}. Please add one in settings.` }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let aiProvider;
+
+      switch (provider) {
+        case 'openai':
+          aiProvider = createOpenAI({ apiKey });
+          const imageModel = aiProvider.image(model);
+
+          console.log('Sending to OpenAI image generation model:', { provider, model, prompt });
+
+          const { images, warnings } = await generateImage({
+            model: imageModel,
+            prompt,
+            n: 1, // For now, generate one image at a time
+            size: '1024x1024',
+          });
+          
+          if (warnings) {
+              console.warn('Image generation warnings:', warnings);
+          }
+
+          return new Response(JSON.stringify({ images }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        
+        case 'google':
+          aiProvider = createGoogleGenerativeAI({ apiKey });
+          const textToImageModel = aiProvider(model);
+
+          console.log('Sending to Google text-to-image model:', { provider, model, prompt });
+
+          const result = await generateText({
+              model: textToImageModel,
+              prompt: prompt,
+              // Some Google models can generate images as part of a text response
+              providerOptions: {
+                  google: { responseModalities: ['IMAGE', 'TEXT'] }
+              }
+          });
+
+          // The response will contain file parts for the images
+          const imageFiles = result.files.filter(f => f.mimeType?.startsWith('image/'));
+
+          if (imageFiles.length === 0) {
+              throw new Error('The AI model did not return an image.');
+          }
+
+          // The frontend expects the raw base64 string, but google provides a data URL.
+          // We need to parse it.
+          const imagesFromGoogle = imageFiles.map(file => {
+            const isDataUrl = file.base64.startsWith('data:');
+            return {
+              base64: isDataUrl ? file.base64.split(',')[1] : file.base64,
+              mimeType: file.mimeType,
+            };
+          });
+
+          return new Response(JSON.stringify({ images: imagesFromGoogle }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+        case 'anthropic':
+        default:
+          return new Response(
+            JSON.stringify({ error: `Image generation is not supported for the '${provider}' provider.` }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+      }
+    }
+
+    // --- CHAT (TEXT) GENERATION INTENT ---
     console.log('Handling chat request with provider:', provider);
     console.log('Messages received:', messages);
     console.log("model capabilities", modelCapabilities);
@@ -136,26 +241,3 @@ export async function handleChatRequest(req) {
   }
 }
 
-// Helper function to save messages to a thread
-async function saveMessageToThread(threadId, message) {
-  try {
-    // In a real app, this would be an API call to your backend
-    console.log(`Saving message to thread ${threadId}:`, message);
-    
-    // Example API call (commented out)
-    /*
-    await fetch(`/api/threads/${threadId}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        role: message.role,
-        content: message.content
-      })
-    });
-    */
-  } catch (error) {
-    console.error('Error saving message to thread:', error);
-  }
-} 

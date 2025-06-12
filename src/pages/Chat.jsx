@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useChat } from '@ai-sdk/react';
-import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film, Share2 } from 'lucide-react';
+import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film, Share2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -39,10 +39,20 @@ const Chat = () => {
   const [showFilesPreview, setShowFilesPreview] = useState(false);
   const fileInputRef = useRef(null);
   const [hasTriggeredAutoResponse, setHasTriggeredAutoResponse] = useState(false);
+  const [isImageGenerationMode, setIsImageGenerationMode] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   const currentModelInfo = useMemo(() => {
     return availableModels.find(m => m.id === selectedModel && m.provider === selectedProvider);
   }, [availableModels, selectedProvider, selectedModel]);
+  
+  const modelsForSelector = useMemo(() => {
+    if (isImageGenerationMode) {
+      // Filter for models that have the 'image' capability
+      return availableModels.filter(m => m.capabilities.includes('image'));
+    }
+    return availableModels;
+  }, [availableModels, isImageGenerationMode]);
   
   // Debug effect for auth state
   useEffect(() => {
@@ -111,6 +121,21 @@ const Chat = () => {
             setSelectedModel(userSettings.defaultModel);
           }
 
+          // If image generation mode is on, ensure the selected model is compatible
+          if (isImageGenerationMode) {
+            const currentModelIsImageCapable = availableModels
+              .find(m => m.id === (threadData.defaultModel || userSettings.defaultModel))
+              ?.capabilities.includes('image');
+
+            if (!currentModelIsImageCapable) {
+              const firstImageModel = availableModels.find(m => m.capabilities.includes('image'));
+              if (firstImageModel) {
+                setSelectedProvider(firstImageModel.provider);
+                setSelectedModel(firstImageModel.id);
+              }
+            }
+          }
+
           // Fetch threads that have branched from the current thread
           const branchData = await appwriteService.getBranchesForThread(threadId);
           if (branchData && branchData.documents) {
@@ -139,7 +164,7 @@ const Chat = () => {
       setThread(null);
       setBranches({});
     }
-  }, [threadId, user, userSettings]);
+  }, [threadId, user, userSettings, isImageGenerationMode, availableModels]);
   
   // Use the AI SDK's useChat hook
   const {
@@ -480,10 +505,129 @@ const Chat = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
   
+  // Handle image generation submission
+  const handleGenerateImage = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || !user) return;
+
+    let currentThreadId = threadId;
+
+    // Create a new thread if one doesn't exist
+    if (!currentThreadId) {
+      try {
+        const newThread = await appwriteService.createChatThread(user.$id, `Image: ${input.substring(0, 40)}...`, selectedProvider, selectedModel);
+        currentThreadId = newThread.$id;
+        // Navigate and let the user resend to avoid complex state management
+        navigate(`/chat/${currentThreadId}`);
+        toast.info("New chat created. Please describe your image again.");
+        return;
+      } catch (error) {
+        toast.error("Failed to create a new chat for the image.");
+        return;
+      }
+    }
+
+    setIsGeneratingImage(true);
+    setInput('');
+
+    // Optimistically add user's prompt to the UI
+    const userMessage = {
+      id: `user_${Date.now()}`,
+      role: 'user',
+      content: input,
+      createdAt: new Date().toISOString(),
+      saved: false,
+    };
+    const loadingMessage = {
+      id: `assistant_loading_${Date.now()}`,
+      role: 'assistant',
+      content: 'loading',
+      createdAt: new Date().toISOString(),
+    }
+    setAiMessages([...allMessages, userMessage, loadingMessage]);
+
+    try {
+      // Save user prompt to DB
+      const savedUserMessage = await appwriteService.createMessage(currentThreadId, user.$id, userMessage.content, {
+        contentType: 'text',
+        model: selectedModel,
+        provider: selectedProvider,
+      });
+      // Update the message in state with its real DB id
+      setAiMessages(current => current.map(m => m.id === userMessage.id ? { ...m, id: savedUserMessage.$id, saved: true } : m));
+
+      // Call the backend API for image generation
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          intent: 'image',
+          prompt: userMessage.content,
+          provider: selectedProvider,
+          model: selectedModel,
+          userId: user.$id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image.');
+      }
+
+      const { images } = await response.json();
+
+      if (!images || images.length === 0) {
+        throw new Error('The AI did not return an image.');
+      }
+
+      const assistantMessage = {
+        id: `assistant_${Date.now()}`,
+        role: 'assistant',
+        content: images[0].base64, // The base64 content
+        contentType: 'image',
+        mimeType: images[0].mimeType,
+        imagePrompt: userMessage.content,
+        createdAt: new Date().toISOString(),
+        model: selectedModel,
+        provider: selectedProvider,
+        saved: false,
+      };
+
+      // Save the AI's image message to the DB
+      const savedAssistantMessage = await appwriteService.createMessage(currentThreadId, 'assistant', assistantMessage.content, {
+        contentType: 'image',
+        mimeType: assistantMessage.mimeType,
+        imagePrompt: assistantMessage.imagePrompt,
+        model: selectedModel,
+        provider: selectedProvider,
+      });
+
+      // Replace loading message with the actual image message
+      setAiMessages(current => current.map(m =>
+        m.id === loadingMessage.id
+          ? { ...assistantMessage, id: savedAssistantMessage.$id, saved: true }
+          : m
+      ));
+
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast.error(error.message);
+      // Remove the loading message on error
+      setAiMessages(current => current.filter(m => m.id !== loadingMessage.id));
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
   // Modify handleSubmit to properly include files in the AI request
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (isImageGenerationMode) {
+      await handleGenerateImage(e);
+      return;
+    }
+
     // If we are in editing mode, call the dedicated edit handler and stop.
     if (editingMessage) {
       await handleConfirmEdit();
@@ -707,9 +851,18 @@ const Chat = () => {
 
     // If the message from appwrite has contentType image, render it
     if (message.contentType === 'image') {
+      // Handle loading state for image generation
+      if (message.content === 'loading') {
+        return (
+          <div className="flex items-center">
+            <Loader2 size={14} className="animate-spin mr-2" />
+            <span>Generating image...</span>
+          </div>
+        );
+      }
       return (
         <img 
-          src={`data:image/png;base64,${message.content}`} 
+          src={`data:${message.mimeType || 'image/png'};base64,${message.content}`} 
           alt={message.imagePrompt || 'Generated Image'} 
           className="rounded-lg"
         />
@@ -1015,7 +1168,7 @@ const Chat = () => {
               className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm"
             >
               <Settings size={14} />
-              {availableModels.find(m => m.id === selectedModel)?.name || selectedModel}
+              {modelsForSelector.find(m => m.id === selectedModel)?.name || selectedModel}
             </button>
           </div>
           
@@ -1024,7 +1177,7 @@ const Chat = () => {
             <div className="absolute right-4 top-16 bg-white shadow-lg rounded-lg border border-gray-200 p-3 z-50 w-64">
               <h3 className="font-medium mb-2 text-gray-700">Select Model</h3>
               <div className="max-h-64 overflow-y-auto">
-                {availableModels.map((model, index) => (
+                {modelsForSelector.map((model, index) => (
                   <button
                     key={index}
                     type="button"
@@ -1130,6 +1283,21 @@ const Chat = () => {
               </div>
             </div>
           )}
+          {isGeneratingImage && !allMessages.some(m => m.content === 'loading') && (
+             <div className="mb-6 flex justify-start">
+              <div className="flex max-w-3xl flex-row">
+                <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 mr-2">
+                  <Bot size={16} />
+                </div>
+                <div className="px-4 py-3 rounded-lg bg-gray-100 text-gray-800 prose prose-sm max-w-none">
+                  <div className="flex items-center">
+                    <Loader2 size={14} className="animate-spin mr-2" />
+                    <span>Generating image<span className="animate-pulse">...</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {status === 'error' && (
             <div className="mb-6 flex justify-start">
               <div className="flex max-w-3xl flex-row">
@@ -1214,6 +1382,23 @@ const Chat = () => {
                   showRecommendation={showModelRecommendation}
                   onClose={() => setShowModelRecommendation(false)}
                 />
+                
+                <div className="mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsImageGenerationMode(!isImageGenerationMode)}
+                    className={`flex items-center gap-2 px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                      isImageGenerationMode
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                    disabled={isLoading || isGeneratingImage}
+                  >
+                    <Sparkles size={14} />
+                    {isImageGenerationMode ? 'Image Mode' : 'Generate Image'}
+                  </button>
+                </div>
+
                 <div className="relative flex items-center">
                   {/* File upload button - moved to the left side */}
                   <input
@@ -1229,7 +1414,7 @@ const Chat = () => {
                     onClick={() => fileInputRef.current?.click()}
                     className="absolute left-2 p-2 text-gray-500 hover:text-gray-700 transition-colors z-10"
                     title="Attach files"
-                    disabled={isLoading}
+                    disabled={isLoading || isGeneratingImage}
                   >
                     <Paperclip size={18} />
                   </button>
@@ -1238,7 +1423,7 @@ const Chat = () => {
                     ref={textareaRef}
                     value={input}
                     onChange={handleInputChange}
-                    placeholder={editingMessage ? "Edit your message..." : files.length > 0 ? "Add a message with your files..." : "Type your message..."}
+                    placeholder={editingMessage ? "Edit your message..." : isImageGenerationMode ? "Describe the image you want to generate..." : files.length > 0 ? "Add a message with your files..." : "Type your message..."}
                     className="w-full p-3 pl-10 pr-40 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent resize-none"
                     rows={1}
                     onKeyDown={(e) => {
@@ -1256,14 +1441,15 @@ const Chat = () => {
                       currentProvider={selectedProvider}
                       currentModel={selectedModel}
                       onSelect={handleModelSelect}
+                      models={modelsForSelector}
                     />
                   </div>
                   
                   {/* Add Stop Generation button when AI is responding */}
-                  {isLoading && (
+                  {(isLoading || isGeneratingImage) && (
                     <button
                       type="button"
-                      onClick={handleStopGeneration}
+                      onClick={isLoading ? handleStopGeneration : () => { /* Add image cancel logic if needed */ }}
                       className="absolute right-14 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
                       title="Stop generating"
                     >
@@ -1274,10 +1460,10 @@ const Chat = () => {
                   <button
                     id="chat-form-submit-button"
                     type="submit"
-                    disabled={(!input.trim() && files.length === 0) || isLoading}
+                    disabled={(!input.trim() && files.length === 0 && !isImageGenerationMode) || isLoading || isGeneratingImage}
                     className="absolute right-2 p-2 rounded-full bg-gray-900 text-white hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLoading ? (
+                    {isLoading || isGeneratingImage ? (
                       <Loader2 size={18} className="animate-spin" />
                     ) : editingMessage ? (
                       <Check size={18} />
@@ -1290,7 +1476,7 @@ const Chat = () => {
               
               <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
                 <div className="flex items-center">
-                  {status === 'ready' ? 'Ready' : status === 'pending' ? 'Thinking...' : 'Error'}
+                  {status === 'ready' && !isGeneratingImage ? 'Ready' : 'Processing...'}
                   {files.length > 0 && (
                     <span className="ml-2">• {files.length} file(s) attached</span>
                   )}
