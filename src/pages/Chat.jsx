@@ -14,6 +14,7 @@ import { nord } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ModelRecommendation from '../components/Chat/ModelRecommendation';
 import InlineModelSelector from '../components/Chat/InlineModelSelector';
 import ShareModal from '../components/ShareModal';
+import { useChat as useChatContext } from '../contexts/ChatContext';
 
 const Chat = () => {
   const { threadId } = useParams();
@@ -21,6 +22,7 @@ const Chat = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { userSettings } = useSettings();
+  const { loadThreads } = useChatContext();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [thread, setThread] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -802,7 +804,8 @@ const Chat = () => {
         }
       );
 
-      const messageCreationPromises = messagesToCopy.map(messageToCopy => {
+      // Create messages sequentially to maintain order
+      for (const messageToCopy of messagesToCopy) {
         const messageMetadata = {
           contentType: messageToCopy.contentType || 'text',
           model: messageToCopy.model,
@@ -816,18 +819,23 @@ const Chat = () => {
           isEdited: messageToCopy.isEdited,
         };
 
-        return appwriteService.createMessage(
+        await appwriteService.createMessage(
           newThread.$id,
           messageToCopy.role === 'user' ? user.$id : 'assistant',
           messageToCopy.content,
           messageMetadata
         );
-      });
-
-      await Promise.all(messageCreationPromises);
+      }
 
       toast.success("Successfully created a new branch!");
-      navigate(`/chat/${newThread.$id}`);
+      
+      // Refresh the threads list before navigation
+      await loadThreads();
+      
+      // Add a small delay to ensure state updates are processed
+      setTimeout(() => {
+        navigate(`/chat/${newThread.$id}`);
+      }, 100);
 
     } catch (error) {
       console.error("Failed to create branch:", error);
@@ -848,6 +856,12 @@ const Chat = () => {
       ...(message.attachments || []),
       ...(message.experimental_attachments || [])
     ].filter(att => att.contentType?.startsWith('image/'));
+
+    // Get non-image attachments
+    const nonImageAttachments = [
+      ...(message.attachments || []),
+      ...(message.experimental_attachments || [])
+    ].filter(att => !att.contentType?.startsWith('image/'));
 
     // If the message from appwrite has contentType image, render it
     if (message.contentType === 'image') {
@@ -873,6 +887,33 @@ const Chat = () => {
 
     return (
       <div className="relative group">
+        {/* Render non-image file attachments */}
+        {nonImageAttachments.length > 0 && (
+          <div className="mt-2 mb-3 space-y-2">
+            {nonImageAttachments.map((attachment, index) => (
+              <a 
+                href={attachment.url} 
+                key={`file-att-${index}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {getFileIcon(attachment.contentType)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {attachment.name}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {formatFileSize(attachment.size)} • {attachment.contentType}
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
         {/* Render a grid of user-uploaded images */}
         {userImageAttachments.length > 0 && (
           <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">

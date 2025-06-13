@@ -3,8 +3,12 @@ import { Download, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Query } from 'appwrite';
 import { appwriteService, databases } from '../lib/appwrite';
+import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 
-const DataExportImport = ({ user }) => {
+const DataExportImport = () => {
+  const { user } = useAuth();
+  const { loadThreads } = useChat();
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
@@ -213,6 +217,8 @@ const DataExportImport = ({ user }) => {
           }
 
           toast.success(`Successfully imported ${importData.threads.length} conversations`);
+          // Refresh the threads list after successful import
+          await loadThreads();
         } catch (parseError) {
           console.error('Error parsing import file:', parseError);
           toast.error(`Failed to parse import file: ${parseError.message}`);
