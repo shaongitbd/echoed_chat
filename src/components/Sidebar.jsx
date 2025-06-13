@@ -139,7 +139,7 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center">
               <Sparkles size={14} className="text-white" />
             </div>
-            <span className="text-base font-bold tracking-tight text-white select-none">AI Chat</span>
+            <span className="text-base font-bold tracking-tight text-white select-none">Echoed</span>
           </div>
         </div>
 

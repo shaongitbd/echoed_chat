@@ -61,7 +61,7 @@ const Register = () => {
       const result = await register(email, password, name);
       
       if (result.success) {
-        toast.success('Registration successful! Welcome to AI Chat.');
+        toast.success('Registration successful! Welcome to Echoed.');
         navigate('/');
       } else {
         toast.error('Registration failed. Please try again.');

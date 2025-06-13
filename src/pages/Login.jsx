@@ -67,7 +67,7 @@ const Login = () => {
       <div className="max-w-md w-full bg-white shadow-lg rounded-xl overflow-hidden">
         <div className="px-8 pt-8 pb-6">
           <h1 className="text-2xl font-bold text-gray-900 text-center">
-            Welcome to AI Chat
+            Welcome to Echoed.Chat
           </h1>
           <h2 className="mt-2 text-center text-base text-gray-600">
             {step === 1 ? 'Sign in to your account' : 'Enter your password'}
