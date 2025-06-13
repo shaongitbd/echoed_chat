@@ -16,13 +16,9 @@ const USERS_COLLECTION_ID = process.env.APPWRITE_USERS_COLLECTION_ID;
 export const handleCreateUserProfile = async (req, res) => {
   try {
     // Use the authenticated user from the request
-    const userId = req.user.$id;
-    const { name, email } = req.body;
+    const { userId, name, email } = req.body;
     
-    if (!userId) {
-      console.error('No user ID found in authenticated request');
-      return res.status(401).json({ error: 'Authentication error: No user ID found' });
-    }
+  
     
     if (!name || !email) {
       return res.status(400).json({ error: 'Missing required fields: name or email' });
@@ -53,12 +49,7 @@ async function createUserProfile(userId, name, email) {
       {
         name,
         email,
-        plan: 'free',
-        usageStats: {
-          textQueries: 0,
-          imageGeneration: 0,
-          videoGeneration: 0
-        }
+        plan: 'free'
       },
       // Set permissions to read-only for the user
       [`read("user:${userId}")`]
