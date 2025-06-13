@@ -250,7 +250,7 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
               <>
                 <li className="px-3 py-2 rounded-md bg-gray-800 text-xs cursor-pointer hover:bg-gray-700 transition-all duration-200 flex items-center gap-2 group shadow-sm">
                   <MessageSquare size={13} className="text-gray-300" />
-                  <span className="truncate font-medium text-white">Welcome to AI Chat Interface</span>
+                  <span className="truncate font-medium text-white">Welcome to Echoed.Chat</span>
                 </li>
                 <li className="px-3 py-2 rounded-md hover:bg-gray-800 text-xs cursor-pointer transition-all duration-200 flex items-center gap-2 group">
                   <MessageSquare size={13} className="text-gray-400" />

@@ -340,7 +340,7 @@ const Home = () => {
       <main className="flex-1 flex flex-col bg-gray-50">
         {/* Header */}
         <header className="border-b border-gray-200 py-3 px-8 flex justify-between items-center bg-white shadow-sm">
-          <h1 className="text-lg font-bold tracking-tight text-gray-800">AI Chat Interface</h1>
+          <h1 className="text-lg font-bold tracking-tight text-gray-800">Echoed.Chat</h1>
           <button
             onClick={() => navigate('/settings')}
             className="p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
