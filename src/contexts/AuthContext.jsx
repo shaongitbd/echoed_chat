@@ -88,6 +88,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
   
+  const loginAsGuest = async () => {
+    setIsLoading(true);
+    try {
+      await appwriteService.createAnonymousSessionAndProfile();
+      await checkAuth(); // This will fetch the user and set it in state
+      toast.success('Guest account created! You can now test the app without signing up.');
+      return { success: true };
+    } catch (error) {
+      console.error('Guest login error:', error);
+      toast.error('Failed to login as guest.');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // Logout
   const logout = async () => {
     setIsLoading(true);
@@ -179,6 +195,7 @@ export const AuthProvider = ({ children }) => {
     register,
     login,
     logout,
+    loginAsGuest,
     refreshAuth,
     updateUserProfile,
     updateUserPreferences

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Plus, User, LogIn, Sparkles, Trash2, Check, X as XIcon } from 'lucide-react';
+import { MessageSquare, Plus, User, LogIn, Sparkles, Trash2, Check, X as XIcon, Settings, LogOut, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { toast } from 'sonner';
 
-const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
+const Sidebar = ({ onCloseMobileMenu }) => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading, logout, refreshAuth } = useAuth();
   const { threads, loadThreads, deleteChatThread, createChatThread } = useChat();
@@ -23,9 +23,11 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
     if (user) {
       console.log('Navigating to settings');
       navigate('/settings');
+      if (onCloseMobileMenu) onCloseMobileMenu();
     } else {
       console.log('Navigating to login');
       navigate('/login');
+      if (onCloseMobileMenu) onCloseMobileMenu();
     }
   };
 
@@ -38,6 +40,7 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
       await logout();
       console.log('Logout successful, navigating to login');
       navigate('/login');
+      if (onCloseMobileMenu) onCloseMobileMenu();
     } catch (error) {
       console.error('Logout failed:', error);
       toast.error('Logout failed');
@@ -61,9 +64,11 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
     
     if (user) {
       navigate('/');
+      if (onCloseMobileMenu) onCloseMobileMenu();
     } else {
       console.log('No user found, navigating to login');
       navigate('/login');
+      if (onCloseMobileMenu) onCloseMobileMenu();
     }
   };
 
@@ -76,12 +81,18 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
       
       // Redirect to home after deleting thread
       navigate('/');
+      if (onCloseMobileMenu) onCloseMobileMenu();
     } catch (error) {
       console.error('Error deleting chat:', error);
       toast.error('Failed to delete chat');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleThreadClick = (threadId) => {
+    navigate(`/chat/${threadId}`);
+    if (onCloseMobileMenu) onCloseMobileMenu();
   };
 
   const handleDebugUser = () => {
@@ -128,203 +139,182 @@ const Sidebar = ({ showMobileMenu = false, onCloseMobileMenu }) => {
 
   return (
     <aside
-      className={`${
-        showMobileMenu ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0 fixed lg:relative inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 transform transition-transform duration-300 ease-in-out z-40 shadow-[5px_0_30px_-15px_rgba(0,0,0,0.2)]`}
+      className="h-full flex flex-col bg-gray-900 border-r border-gray-700 shadow-md w-full"
     >
-      <div className="flex flex-col h-full">
-        {/* Logo area */}
-        <div className="px-5 py-3 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center">
-              <Sparkles size={14} className="text-white" />
-            </div>
-            <span className="text-base font-bold tracking-tight text-white select-none">Echoed</span>
+      {/* Logo and header */}
+      <div className="p-4 border-b border-gray-700">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
+            <Sparkles size={16} className="text-blue-400" />
           </div>
+          <h1 className="text-xl font-bold text-white">Echoed.Chat</h1>
         </div>
-
-        {/* New chat button */}
-        <div className="p-4 border-b border-gray-800">
-          <button
-            onClick={handleNewChat}
-            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm font-medium text-gray-900 bg-white rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all duration-200 shadow-sm"
-            type="button"
-          >
-            <Plus size={14} className="text-gray-700" />
-            New Chat
-          </button>
-          
         
+        {/* New chat button */}
+        <button
+          onClick={handleNewChat}
+          className="w-full  flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm"
+        >
+          <Plus size={16} />
+          New Chat
+        </button>
+      </div>
+
+      {/* Navigation links */}
+      <div className="p-3 border-b border-gray-700">
+        <button
+          onClick={() => {
+            navigate('/');
+            if (onCloseMobileMenu) onCloseMobileMenu();
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <Home size={16} />
+          Home
+        </button>
+        
+        <button
+          onClick={handleLoginClick}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-lg transition-colors mt-1"
+        >
+          <Settings size={16} />
+          Settings
+        </button>
+      </div>
+
+      {/* Chat history */}
+      <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            {user ? 'YOUR CHATS' : 'RECENT CHATS'}
+          </h2>
         </div>
-
-        {/* Chat history */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="text-[11px] font-semibold text-gray-400 mb-3 tracking-wider uppercase">
-            {user ? 'Your Chats' : 'Recent Chats'}
+        
+        {user && threads.length === 0 && !isLoading && (
+          <div className="text-center py-8 px-4">
+            <div className="w-12 h-12 mx-auto bg-gray-700 rounded-full flex items-center justify-center mb-3">
+              <MessageSquare size={20} className="text-gray-400" />
+            </div>
+            <p className="text-sm text-gray-400 mb-2">No chats yet</p>
+            <button 
+              onClick={handleNewChat}
+              className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+            >
+              Start a new chat
+            </button>
           </div>
-          
-          {user && threads.length === 0 && !isLoading && (
-            <div className="text-center py-6">
-              <p className="text-xs text-gray-400">No chats yet</p>
-              <button 
-                onClick={handleNewChat}
-                className="mt-2 text-xs text-white hover:underline"
-              >
-                Start a new chat
-              </button>
-            </div>
-          )}
-          
-          {user && isLoading && (
-            <div className="space-y-2 px-1 animate-pulse">
-              <div className="h-10 bg-gray-800 rounded-md"></div>
-              <div className="h-10 bg-gray-800 rounded-md"></div>
-              <div className="h-10 bg-gray-800 rounded-md"></div>
-            </div>
-          )}
-          
-          <ul className="space-y-1.5">
-            {user ? (
-              threads.map(thread => (
-                <li 
-                  key={thread.$id}
-                  className="relative group"
+        )}
+        
+        {user && isLoading && (
+          <div className="space-y-2 animate-pulse">
+            <div className="h-12 bg-gray-700 rounded-lg"></div>
+            <div className="h-12 bg-gray-700 rounded-lg"></div>
+            <div className="h-12 bg-gray-700 rounded-lg"></div>
+          </div>
+        )}
+        
+        {threads.length > 0 && (
+          <div className="space-y-1">
+            {threads.map(thread => (
+              <div key={thread.$id} className="relative group">
+                <button
+                  onClick={() => handleThreadClick(thread.$id)}
+                  className="w-full text-left p-2 rounded-lg hover:bg-gray-700 transition-colors flex items-start gap-2"
                 >
-                  <div 
-                    onClick={() => navigate(`/chat/${thread.$id}`)}
-                    className="px-3 py-2 rounded-md hover:bg-gray-800 text-xs cursor-pointer transition-all duration-200 flex items-center gap-2"
-                  >
-                    <MessageSquare size={13} className="text-gray-400 flex-shrink-0" />
-                    <span className="truncate text-gray-300">{thread.title || 'Untitled chat'}</span>
-                    
-                    {thread.$updatedAt && (
-                      <span className="text-[10px] text-gray-500 ml-auto whitespace-nowrap">
-                        {formatDate(thread.$updatedAt)}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Delete button (visible on hover) */}
-                  {deleteConfirmation !== thread.$id && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteConfirmation(thread.$id);
-                      }}
-                      className="absolute right-2 top-2 p-1 rounded-md bg-gray-800 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity duration-200"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                  
-                  {/* Delete confirmation */}
-                  {deleteConfirmation === thread.$id && (
-                    <div className="absolute inset-0 bg-gray-800 rounded-md flex items-center justify-between px-2">
-                      <span className="text-[10px] text-gray-300">Delete chat?</span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteThread(thread.$id);
-                          }}
-                          disabled={isLoading}
-                          className="p-1 rounded-md hover:bg-gray-700 text-green-400"
-                        >
-                          <Check size={12} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmation(null);
-                          }}
-                          className="p-1 rounded-md hover:bg-gray-700 text-red-400"
-                        >
-                          <XIcon size={12} />
-                        </button>
-                      </div>
+                  <MessageSquare size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-200 truncate">
+                      {thread.title || 'Untitled Chat'}
                     </div>
-                  )}
-                </li>
-              ))
-            ) : (
-              <>
-                <li className="px-3 py-2 rounded-md bg-gray-800 text-xs cursor-pointer hover:bg-gray-700 transition-all duration-200 flex items-center gap-2 group shadow-sm">
-                  <MessageSquare size={13} className="text-gray-300" />
-                  <span className="truncate font-medium text-white">Welcome to Echoed.Chat</span>
-                </li>
-                <li className="px-3 py-2 rounded-md hover:bg-gray-800 text-xs cursor-pointer transition-all duration-200 flex items-center gap-2 group">
-                  <MessageSquare size={13} className="text-gray-400" />
-                  <span className="truncate text-gray-300">How to use advanced features</span>
-                </li>
-                <li className="px-3 py-2 rounded-md hover:bg-gray-800 text-xs cursor-pointer transition-all duration-200 flex items-center gap-2 group">
-                  <MessageSquare size={13} className="text-gray-400" />
-                  <span className="truncate text-gray-300">Image generation examples</span>
-                </li>
-              </>
-            )}
-          </ul>
-        </nav>
-
-        {/* User section */}
-        <div className="p-4 border-t border-gray-800 bg-gray-800">
+                    <div className="text-xs text-gray-400 truncate">
+                      {formatDate(thread.$updatedAt)}
+                    </div>
+                  </div>
+                </button>
+                
+                {/* Delete button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteConfirmation(thread.$id);
+                  }}
+                  className="absolute right-2 top-2 p-1 rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 size={14} />
+                </button>
+                
+                {/* Delete confirmation */}
+                {deleteConfirmation === thread.$id && (
+                  <div className="absolute top-0 left-0 w-full h-full bg-gray-800 bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteThread(thread.$id);
+                        }}
+                        disabled={isLoading}
+                        className="p-1.5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                      >
+                        {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmation(null);
+                        }}
+                        className="p-1.5 rounded-full bg-gray-600 text-white hover:bg-gray-500 transition-colors"
+                      >
+                        <XIcon size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* User section */}
+      <div className="p-3 border-t border-gray-700">
+        {user ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center shadow-inner">
-                <User size={15} className="text-gray-300" />
+              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-gray-300">
+                <User size={16} />
               </div>
-              <div>
-                <div className="text-xs font-semibold text-gray-200">
-                  {user ? (user.name || user.email) : 'Guest User'}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-200 truncate flex items-center">
+                  {user.name || user.email}
+                  {(!user.email || (user.$createdAt && new Date(user.$createdAt).getTime() === new Date(user.$updatedAt).getTime())) && (
+                    <span className="ml-1.5 px-1.5 py-0.5 bg-gray-600 text-gray-300 rounded text-xs">Guest</span>
+                  )}
                 </div>
-                <div className="text-[10px] text-gray-400 mt-0.5">
-                  {user ? 'Signed in' : 'Sign in to save chats'}
+                <div className="text-xs text-gray-400 truncate">
+                  {user.email || 'Guest Account'}
                 </div>
               </div>
             </div>
-            <div className="flex gap-2">
-              {user && (
-                <button
-                  onClick={handleLogoutClick}
-                  className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 shadow-sm hover:shadow transition-all duration-200"
-                  title="Sign out"
-                  type="button"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-200">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                </button>
-              )}
-              <button
-                onClick={handleLoginClick}
-                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 shadow-sm hover:shadow transition-all duration-200"
-                title={user ? "Settings" : "Sign in"}
-                type="button"
-              >
-                {user ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-200">
-                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                ) : (
-                  <LogIn size={15} className="text-gray-200" />
-                )}
-              </button>
-              {/* Debug refresh button */}
-              <button
-                onClick={handleRefreshAuth}
-                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 shadow-sm hover:shadow transition-all duration-200"
-                title="Refresh Auth"
-                type="button"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-200">
-                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.44-4.5M22 12.5a10 10 0 0 1-18.44 4.5"/>
-                </svg>
-              </button>
-            </div>
+            <button
+              onClick={handleLogoutClick}
+              className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+              title="Logout"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-        </div>
+        ) : (
+          <button
+            onClick={() => {
+              navigate('/login');
+              if (onCloseMobileMenu) onCloseMobileMenu();
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            <LogIn size={16} />
+            Sign In
+          </button>
+        )}
       </div>
     </aside>
   );

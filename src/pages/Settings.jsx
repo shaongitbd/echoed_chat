@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { User, BarChart3, Layers, Loader2, Save, CheckCircle, AlertCircle, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
-import Sidebar from '../components/Sidebar';
 import DataExportImport from '../components/DataExportImport';
 import { appwriteService } from '../lib/appwrite';
 
@@ -592,7 +591,6 @@ const Settings = () => {
   const { user, updateUserProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -741,10 +739,7 @@ const Settings = () => {
   };
   
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      {/* Sidebar */}
-      <Sidebar showMobileMenu={showMobileMenu} onCloseMobileMenu={() => setShowMobileMenu(false)} />
-      
+    <div className="flex flex-col bg-gray-50 font-sans h-full">
       {/* Main content */}
       <main className="flex-1 flex flex-col bg-gray-50 overflow-y-auto">
         {/* Header */}

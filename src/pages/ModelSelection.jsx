@@ -10,7 +10,6 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createMistral } from '@ai-sdk/mistral';
 import { appwriteService } from '../lib/appwrite';
-import Sidebar from '../components/Sidebar';
 
 const ModelSelection = () => {
   const navigate = useNavigate();
@@ -37,7 +36,8 @@ const ModelSelection = () => {
       apiKey: '',
       models: {}
     },
-    mistral: {
+   
+    echoed: {
       selected: false,
       apiKey: '',
       models: {}
@@ -396,7 +396,7 @@ const ModelSelection = () => {
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
       {/* Sidebar */}
-      <Sidebar />
+    
       
       <div className="flex-1 overflow-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto">

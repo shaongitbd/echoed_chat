@@ -7,7 +7,7 @@ import { ArrowRight, Loader2, ChevronLeft, Mail } from 'lucide-react';
 const Register = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { register, isLoading } = useAuth();
+  const { register, isLoading, loginAsGuest } = useAuth();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -77,10 +77,25 @@ const Register = () => {
       }
     }
   };
+
+  const handleGuestLogin = async () => {
+    try {
+      const result = await loginAsGuest();
+      if (result.success) {
+        toast.success('Continuing as a guest! Welcome to Echoed.');
+        navigate('/');
+      } else {
+        toast.error('Could not log in as guest. Please try again.');
+      }
+    } catch (error) {
+      console.error('Guest login error:', error);
+      toast.error('An error occurred during guest login.');
+    }
+  };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white shadow-lg rounded-xl overflow-hidden">
+    <div className="flex-1 flex items-center justify-center h-full py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white shadow-lg rounded-xl overflow-hidden lg:-ml-36 my-auto">
         <div className="px-8 pt-8 pb-6">
           <h1 className="text-2xl font-bold text-gray-900 text-center">
             Create an Account

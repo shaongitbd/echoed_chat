@@ -369,28 +369,7 @@ class AppwriteService {
       const messages = await this.getMessages(threadId, null, 5000); // Increased limit
       console.log(`Found ${messages.documents.length} messages to delete in thread ${threadId}`);
       
-      // Handle message deletion in batches to avoid overwhelming the server
-      const batchSize = 50;
-      for (let i = 0; i < messages.documents.length; i += batchSize) {
-        const batch = messages.documents.slice(i, i + batchSize);
-        const deletePromises = batch.map(async (message) => {
-          try {
-            await this.deleteMessage(message.$id);
-            return { success: true, id: message.$id };
-          } catch (err) {
-            console.error(`Failed to delete message ${message.$id}:`, err);
-            return { success: false, id: message.$id, error: err };
-          }
-        });
-        
-        const results = await Promise.all(deletePromises);
-        const failures = results.filter(r => !r.success);
-        if (failures.length > 0) {
-          console.warn(`Failed to delete ${failures.length} messages`, failures);
-        }
-        
-        console.log(`Deleted batch ${i/batchSize + 1}/${Math.ceil(messages.documents.length/batchSize)}`);
-      }
+    
       
       // Now delete the thread
       console.log(`Deleting thread document: ${threadId}`);
@@ -1088,6 +1067,22 @@ class AppwriteService {
       return response.documents;
     } catch (error) {
       console.error('Error fetching pricing plans:', error);
+      throw error;
+    }
+  }
+
+  async createAnonymousSessionAndProfile() {
+    try {
+      await account.createAnonymousSession();
+      const user = await this.getCurrentUser();
+      console.log("Anonymous user created:", user);
+      if (user && user.$id) {
+        // The backend handles profile creation.
+        // We assume it can handle a null email for guest users.
+        await this.createUserProfile(user.$id, 'Guest', null);
+      }
+    } catch (error) {
+      console.error('Error in createAnonymousSessionAndProfile:', error);
       throw error;
     }
   }

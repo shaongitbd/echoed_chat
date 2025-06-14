@@ -45,47 +45,30 @@ const App = () => {
           <SettingsProvider>
             <ChatProvider>
               <Routes>
-                {/* Home route */}
-                <Route path="/" element={<Home />} />
+                {/* Home route - now using Layout */}
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Home />} />
+                </Route>
 
                 {/* Auth routes */}
-                <Route
-                  path="/login"
-                  element={
-                    <GuestRoute>
-                      <Login />
-                    </GuestRoute>
-                  }
-                />
-                <Route
-                  path="/register"
-                  element={
-                    <GuestRoute>
-                      <Register />
-                    </GuestRoute>
-                  }
-                />
-                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route element={<GuestRoute><Layout /></GuestRoute>}>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                </Route>
+                
+                <Route path="/reset-password" element={<Layout />}>
+                  <Route index element={<ResetPassword />} />
+                </Route>
                 
                 {/* Model selection after signup */}
-                <Route
-                  path="/model-selection"
-                  element={
-                    <ProtectedRoute>
-                      <ModelSelection />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/model-selection" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                  <Route index element={<ModelSelection />} />
+                </Route>
                 
                 {/* Settings standalone route */}
-                <Route
-                  path="/settings"
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/settings" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                  <Route index element={<Settings />} />
+                </Route>
                 
                 {/* App routes */}
                 <Route path="/chat" element={<ProtectedRoute><Layout /></ProtectedRoute>}>

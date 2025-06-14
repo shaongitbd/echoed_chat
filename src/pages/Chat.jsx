@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useChat } from '@ai-sdk/react';
-import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film, Share2, Sparkles } from 'lucide-react';
+import { Send, Loader2, Bot, User, Image as ImageIcon, Video, Menu, X, Settings, Copy, Edit, Trash2, RefreshCw, AlertTriangle, Check, GitFork, Paperclip, FileText, Music, Film, Share2, Sparkles, MessageSquare as UserIcon, Bot as BotIcon, Copy as CopyIcon, Edit as EditIcon, Trash as TrashIcon, GitBranch as BranchIcon, RotateCcw as RegenerateIcon, AlertCircle as AlertIcon, Loader as LoaderIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { appwriteService } from '../lib/appwrite';
-import Sidebar from '../components/Sidebar';
 import { formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -870,7 +869,7 @@ const Chat = () => {
         return (
           <div className="flex items-center">
             <Loader2 size={14} className="animate-spin mr-2" />
-            <span>Generating image...</span>
+            <span className="font-normal font-[Google_Sans]">Generating image...</span>
           </div>
         );
       }
@@ -886,7 +885,7 @@ const Chat = () => {
     const messageBranches = branches[message.id];
 
     return (
-      <div className="relative group">
+      <div className="relative group font-normal font-[Google_Sans]">
         {/* Render non-image file attachments */}
         {nonImageAttachments.length > 0 && (
           <div className="mt-2 mb-3 space-y-2">
@@ -962,51 +961,15 @@ const Chat = () => {
                         <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded-sm font-mono text-sm" {...props}>{children}</code>
                     );
                 },
-                p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
+                p: ({ node, ...props }) => <p className="mb-2 last:mb-0 font-normal font-[Google_Sans]" {...props} />
             }}
+            className="font-normal font-[Google_Sans]"
             >{textParts}</ReactMarkdown>
         )}
         
-        {/* Hover action buttons below AI messages */}
-        {message.role === 'assistant' && (
-          <div className="absolute bottom-[-60px] left-0 flex flex-nowrap items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-600">
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(textParts);
-                toast.success('Message copied to clipboard');
-              }}
-              className="p-1 hover:bg-gray-100 rounded"
-              title="Copy text"
-            >
-              <Copy size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBranch(message.id)}
-              className="p-1 hover:bg-gray-100 rounded"
-              title="Branch conversation"
-            >
-              <GitFork size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRegenerate(message.id)}
-              className="p-1 hover:bg-gray-100 rounded"
-              title="Regenerate response"
-            >
-              <RefreshCw size={15} />
-            </button>
-            {message.model && (
-              <span className="text-sm font-medium text-gray-500 whitespace-nowrap">
-                {availableModels.find(m => m.id === message.model)?.name || message.model}
-              </span>
-            )}
-          </div>
-        )}
         {messageBranches && messageBranches.length > 0 && (
-          <div className="mt-4 border-t border-gray-200 pt-3 text-sm">
-            <h4 className="font-semibold text-gray-600 mb-2 flex items-center">
+          <div className="mt-4 border-t border-gray-200 pt-3 text-sm font-[Google_Sans]">
+            <h4 className="font-medium text-gray-600 mb-2 flex items-center">
               <GitFork size={14} className="mr-1.5" /> Branches from this message
             </h4>
             <ul className="space-y-1">
@@ -1159,7 +1122,7 @@ const Chat = () => {
   }, [threadId, messages, location.search, navigate, reload, hasTriggeredAutoResponse]);
   
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
+    <div className="flex h-screen bg-gray-50 font-[Google_Sans]">
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-3 left-3 z-50">
         <button
@@ -1170,8 +1133,7 @@ const Chat = () => {
         </button>
       </div>
 
-      {/* Sidebar */}
-      <Sidebar showMobileMenu={showMobileMenu} onCloseMobileMenu={() => setShowMobileMenu(false)} />
+    
       
       {/* Main content */}
       <main className="flex-1 flex flex-col bg-white">
@@ -1246,140 +1208,175 @@ const Chat = () => {
         
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {isLoadingMessages ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <Loader2 size={32} className="text-gray-400 animate-spin mb-4" />
-              <p className="text-gray-500">Loading messages...</p>
-            </div>
-          ) : allMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                <Bot size={28} className="text-gray-600" />
+          <div className="max-w-4xl mx-auto">
+            {isLoadingMessages ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <Loader2 size={32} className="text-gray-400 animate-spin mb-4" />
+                <p className="text-gray-500">Loading messages...</p>
               </div>
-              <h2 className="text-xl font-medium text-gray-900 mb-2">Start a new conversation</h2>
-              <p className="text-gray-500 max-w-sm">
-                Ask a question or start a conversation with the AI assistant.
-              </p>
-            </div>
-          ) : (
-            allMessages.map((message) => (
-              <div
-                key={message.id}
-                className={`mb-6 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`flex flex-col max-w-3xl group ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`flex ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
-                      message.role === 'user' ? 'bg-gray-900 text-white ml-2' : 'bg-gray-100 text-gray-600 mr-2'
-                    }`}>
-                      {message.role === 'user' ? (
-                        <User size={16} />
-                      ) : (
-                        <Bot size={16} />
-                      )}
-                    </div>
-                    
-                    <div className={`px-4 py-3 rounded-lg prose prose-sm max-w-none relative ${
-                      message.role === 'user'
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {renderMessageContent(message)}
-                      {/* User message actions moved to below the message */}
-                    </div>
-                  </div>
-                  
-                  {/* User message actions - now placed directly under the message bubble, visible on hover */}
-                  {message.role === 'user' && (
-                    <div className="mt-2 flex justify-end pr-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="flex items-center bg-gray-100 rounded-md px-2 py-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(typeof message.content === 'string' ? message.content : '');
-                            toast.success('Message copied to clipboard');
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded text-gray-700"
-                          title="Copy text"
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(message)}
-                          className="p-1 hover:bg-gray-200 rounded text-gray-700 ml-2"
-                          title="Edit message"
-                        >
-                          <Edit size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(message.id)}
-                          className="p-1 hover:bg-gray-200 rounded text-gray-700 ml-2"
-                          title="Delete message"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+            ) : allMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <Bot size={28} className="text-gray-600" />
+                </div>
+                <h2 className="text-xl font-medium text-gray-900 mb-2">Start a new conversation</h2>
+                <p className="text-gray-500 max-w-sm">
+                  Ask a question or start a conversation with the AI assistant.
+                </p>
+              </div>
+            ) : (
+              allMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`mb-8 flex w-full ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <div className="max-w-full md:max-w-[90%] group relative">
+                    {message.role === 'user' ? (
+                      <>
+                        <div className="rounded-lg bg-gray-900 text-white px-4 py-3 shadow-sm font-normal font-[Google_Sans]">
+                          {renderMessageContent(message)}
+                        </div>
+                        
+                        {/* User message actions */}
+                        <div className="flex gap-2 mt-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(typeof message.content === 'string' ? message.content : '');
+                              toast.success('Message copied to clipboard');
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600 flex items-center text-xs"
+                            title="Copy text"
+                          >
+                            <Copy size={14} className="mr-1" /> Copy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(message)}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600 flex items-center text-xs"
+                            title="Edit message"
+                          >
+                            <Edit size={14} className="mr-1" /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(message.id)}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-600 flex items-center text-xs"
+                            title="Delete message"
+                          >
+                            <Trash2 size={14} className="mr-1" /> Delete
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="font-[Google_Sans]">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-700 text-white">
+                            <BotIcon size={16} strokeWidth={1.5} />
+                          </div>
+                          <div className="font-medium text-gray-800">
+                            AI
+                            {message.model && (
+                              <span className="ml-2 text-xs text-gray-500 font-normal">
+                                · {availableModels.find(m => m.id === message.model)?.name || message.model}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="prose prose-sm max-w-none text-gray-800 prose-p:leading-relaxed font-normal">
+                          {renderMessageContent(message)}
+                          
+                          {/* AI message actions */}
+                          <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(typeof message.content === 'string' ? message.content : '');
+                                toast.success('Message copied to clipboard');
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded text-gray-500 flex items-center text-xs font-normal"
+                              title="Copy text"
+                            >
+                              <Copy size={14} className="mr-1" /> Copy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleBranch(message.id)}
+                              className="p-1 hover:bg-gray-100 rounded text-gray-500 flex items-center text-xs font-normal"
+                              title="Branch conversation"
+                            >
+                              <GitFork size={14} className="mr-1" /> Branch
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRegenerate(message.id)}
+                              className="p-1 hover:bg-gray-100 rounded text-gray-500 flex items-center text-xs font-normal"
+                              title="Regenerate response"
+                            >
+                              <RefreshCw size={14} className="mr-1" /> Regenerate
+                            </button>
+                          </div>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+            {isLoading && (
+              <div className="flex justify-start mb-8 font-[Google_Sans]">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-700 text-white">
+                    <BotIcon size={16} strokeWidth={1.5} className="animate-pulse" />
+                  </div>
+                  <div className="font-medium text-gray-800">
+                    <div className="flex items-center">
+                      <LoaderIcon size={16} className="animate-spin mr-2" />
+                      <span>Thinking...</span>
                     </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-          {isLoading && (
-            <div className="mb-6 flex justify-start">
-              <div className="flex max-w-3xl flex-row">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 mr-2">
-                  <Bot size={16} />
-                </div>
-                <div className="px-4 py-3 rounded-lg bg-gray-100 text-gray-800 prose prose-sm max-w-none">
-                  <div className="flex items-center">
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                    <span>Thinking<span className="animate-pulse">...</span></span>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          {isGeneratingImage && !allMessages.some(m => m.content === 'loading') && (
-             <div className="mb-6 flex justify-start">
-              <div className="flex max-w-3xl flex-row">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-600 mr-2">
-                  <Bot size={16} />
-                </div>
-                <div className="px-4 py-3 rounded-lg bg-gray-100 text-gray-800 prose prose-sm max-w-none">
-                  <div className="flex items-center">
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                    <span>Generating image<span className="animate-pulse">...</span></span>
+            )}
+            {isGeneratingImage && !allMessages.some(m => m.content === 'loading') && (
+              <div className="flex justify-start mb-8 font-[Google_Sans]">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-gray-700 text-white">
+                    <BotIcon size={16} strokeWidth={1.5} className="animate-pulse" />
+                  </div>
+                   <div className="font-medium text-gray-800">
+                    <div className="flex items-center">
+                      <LoaderIcon size={16} className="animate-spin mr-2" />
+                      <span>Generating Image...</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          {status === 'error' && (
-            <div className="mb-6 flex justify-start">
-              <div className="flex max-w-3xl flex-row">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-red-100 text-red-600 mr-2">
-                  <AlertTriangle size={16} />
-                </div>
-                <div className="px-4 py-3 rounded-lg bg-red-50 text-red-900 prose prose-sm max-w-none">
-                  <p className="font-bold">
-                    {error?.name && error.name !== 'Error' ? error.name : 'AI Response Error'}
-                  </p>
-                  <p>{error?.message || 'Failed to get a response. Please check your connection or API key and try again.'}</p>
-                  <button
-                    type="button"
-                    onClick={() => reload()}
-                    className="mt-2 text-xs font-semibold text-red-700 hover:underline"
-                  >
-                    Retry
-                  </button>
+            )}
+            {status === 'error' && (
+               <div className="flex justify-start mb-8 font-[Google_Sans]">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-red-600 text-white">
+                    <AlertIcon size={16} strokeWidth={1.5} />
+                  </div>
+                  <div className="text-gray-800">
+                    <div className="font-medium">Error</div>
+                     <p className="text-red-600 text-sm font-normal">{error?.message || 'Failed to get a response. Please check your connection or API key and try again.'}</p>
+                    <button
+                      type="button"
+                      onClick={() => reload()}
+                      className="mt-2 text-xs font-medium text-red-700 hover:underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+            )}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
         
         {/* Input area */}

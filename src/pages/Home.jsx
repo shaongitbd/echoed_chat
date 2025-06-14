@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail, Paperclip, FileText, Music, Film, GitFork, Share2, ArrowRightLeft, Lock } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { appwriteService } from '../lib/appwrite';
@@ -10,10 +9,9 @@ import InlineModelSelector from '../components/Chat/InlineModelSelector';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading, loginAsGuest } = useAuth();
   const { userSettings } = useSettings();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [input, setInput] = useState('');
   const [isCheckingPreferences, setIsCheckingPreferences] = useState(true);
   const [showPreferencesPrompt, setShowPreferencesPrompt] = useState(false);
@@ -23,7 +21,29 @@ const Home = () => {
   const [isImageGenerationMode, setIsImageGenerationMode] = useState(false);
   const [files, setFiles] = useState([]);
   const [showFilesPreview, setShowFilesPreview] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Auto-login as guest if no user is detected after auth check completes
+  useEffect(() => {
+    const handleAutoGuestLogin = async () => {
+      // Only attempt auto-login once, and only after auth loading is complete
+      if (!isLoading && !user && !autoLoginAttempted) {
+        setAutoLoginAttempted(true);
+        console.log('No authenticated user detected, attempting guest login');
+        try {
+          await loginAsGuest();
+          console.log('Guest login successful');
+          toast.info('We\'ve set up a guest account for you to test things out. Your data will be saved, but for full features, consider signing up.');
+        } catch (error) {
+          console.error('Auto guest login failed:', error);
+          // Don't show a toast here to avoid confusing the user
+        }
+      }
+    };
+
+    handleAutoGuestLogin();
+  }, [user, isLoading, loginAsGuest, autoLoginAttempted]);
 
   // Create a list of available models from enabled providers in settings
   useEffect(() => {
@@ -117,17 +137,16 @@ const Home = () => {
   }, [user]);
 
   const handleInputFocus = () => {
+    // Don't show login modal if user exists (including anonymous users)
     if (!user) {
+      // This should never happen now due to auto guest login,
+      // but keeping as a fallback
       setShowLoginModal(true);
     }
   };
 
   const handleCloseModal = () => {
     setShowLoginModal(false);
-  };
-  
-  const handleCloseMobileMenu = () => {
-    setShowMobileMenu(false);
   };
   
   // --- File Handling Functions ---
@@ -180,6 +199,8 @@ const Home = () => {
     e.preventDefault();
 
     if (!user) {
+      // This should never happen now due to auto guest login,
+      // but keeping as a fallback
       handleInputFocus();
       return;
     }
@@ -295,269 +316,268 @@ const Home = () => {
     }
   };
 
-  const FeatureHighlight = ({ icon, title, description }) => (
-    <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-start gap-4 text-left">
-      <div className="flex-shrink-0 w-8 h-8 mt-1 rounded-full bg-gray-100 flex items-center justify-center">
-        {icon}
-      </div>
-      <div>
-        <h4 className="font-semibold text-gray-800">{title}</h4>
-        <p className="text-sm text-gray-600">{description}</p>
-      </div>
-    </div>
-  );
-
-  // Show loading state while checking preferences
-  if (isCheckingPreferences && user) {
-    return (
-      <div className="flex h-screen bg-gray-50 font-sans items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center mx-auto shadow-lg animate-pulse">
-            <Sparkles size={32} className="text-white" />
-          </div>
-          <p className="mt-4 text-gray-600">Loading your preferences...</p>
-        </div>
-      </div>
-    );
-  }
+  // Determine if we should show a loading state
+  const showLoadingState = isLoading || isCheckingPreferences;
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-3 left-3 z-50">
-        <button
-          onClick={() => setShowMobileMenu(!showMobileMenu)}
-          className="p-2 rounded-full bg-white text-gray-800 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
-        >
-          {showMobileMenu ? <X size={18} /> : <Menu size={18} />}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <Sidebar showMobileMenu={showMobileMenu} onCloseMobileMenu={handleCloseMobileMenu} />
-
+    <div className="flex flex-col min-h-screen bg-white">
       {/* Main content */}
-      <main className="flex-1 flex flex-col bg-gray-50">
-        {/* Header */}
-        <header className="border-b border-gray-200 py-3 px-8 flex justify-between items-center bg-white shadow-sm">
-          <h1 className="text-lg font-bold tracking-tight text-gray-800">Echoed.Chat</h1>
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
-            title="Settings"
-          >
-            <Settings size={15} className="text-gray-600" />
-          </button>
-        </header>
-
-        {/* Welcome screen / Chat area */}
-        <section className="flex-1 flex flex-col justify-center items-center p-8 overflow-y-auto">
-          {showPreferencesPrompt && (
-            <div className="w-full max-w-lg mb-8 bg-white p-6 rounded-lg border border-yellow-200 shadow-md">
-              <div className="flex items-center justify-center mb-4">
-                <Settings size={24} className="text-yellow-500 mr-2" />
-                <h3 className="text-lg font-medium text-gray-800">Set Up AI Models</h3>
-              </div>
-              <p className="text-gray-600 mb-4 text-center">
-                To start using the chat, you need to set up your AI model preferences first.
-              </p>
-              <button
-                onClick={() => navigate('/model-selection')}
-                className="w-full py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Set Up Now
-              </button>
-            </div>
-          )}
-          
-          <div className="w-full max-w-lg text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center mx-auto shadow-lg">
-              <Sparkles size={32} className="text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mt-6">
-              A powerful, multi-modal AI chat experience
-            </h2>
-            <p className="text-gray-600 mt-2 max-w-xl mx-auto">
-              Go beyond simple text conversations. Generate images, branch your ideas, collaborate with others, and manage your chat history with ease.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-              <FeatureHighlight
-                icon={<MessageSquare size={16} className="text-gray-500" />}
-                title="Advanced Chat"
-                description="Engage in dynamic, multi-turn conversations with a wide range of AI models."
-              />
-              <FeatureHighlight
-                icon={<Image size={16} className="text-gray-500" />}
-                title="Image Generation"
-                description="Bring your ideas to life by generating stunning images from text descriptions."
-              />
-              <FeatureHighlight
-                icon={<GitFork size={16} className="text-gray-500" />}
-                title="Chat Branching"
-                description="Explore different lines of thought by creating branches from any point in a conversation."
-              />
-              <FeatureHighlight
-                icon={<Share2 size={16} className="text-gray-500" />}
-                title="Seamless Sharing"
-                description="Share your conversations publicly or invite collaborators to chat with you."
-              />
-              <FeatureHighlight
-                icon={<ArrowRightLeft size={16} className="text-gray-500" />}
-                title="Import & Export"
-                description="Easily move your chat history between different accounts or platforms."
-              />
-              <FeatureHighlight
-                icon={<Lock size={16} className="text-gray-500" />}
-                title="Authentication & DB Sync"
-                description="User authentication enables you to securely store your chats. All conversations are synced to a database associated with your account, accessible anytime, anywhere, on any device."
-              />
-            </div>
+      <main className="flex-1 flex flex-col">
+        {/* Show loading state or content based on auth status */}
+        {showLoadingState ? (
+          <div className="flex items-center justify-center h-screen">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-900"></div>
           </div>
-        </section>
-
-        {/* Input area */}
-        <footer className="px-8 py-4 bg-gray-50 border-t border-gray-200">
-          <form onSubmit={handleStartChat} className="w-full max-w-3xl mx-auto">
-            {showFilesPreview && files.length > 0 && (
-              <div className="mb-3 p-3 border border-gray-200 rounded-lg bg-white">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium text-gray-700">Attached Files ({files.length})</h3>
-                  <button type="button" onClick={clearFiles} className="text-xs text-gray-500 hover:text-gray-700">Clear all</button>
-                </div>
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center bg-gray-50 p-1.5 rounded border border-gray-300 text-xs">
-                      {file.type.startsWith('image/') ? (
-                         <img src={URL.createObjectURL(file)} alt="preview" className="w-6 h-6 mr-2 rounded object-cover" />
-                      ) : (
-                         <span className="mr-1">{getFileIcon(file.type)}</span>
-                      )}
-                      <span className="max-w-[150px] truncate">{file.name}</span>
-                      <span className="mx-1 text-gray-400">({formatFileSize(file.size)})</span>
-                      <button type="button" onClick={() => removeFile(index)} className="ml-1 text-gray-400 hover:text-gray-600"><X size={14} /></button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        ) : (
+          <>
+           
             
-            <div className="mb-2">
-              <button
-                type="button"
-                onClick={() => setIsImageGenerationMode(!isImageGenerationMode)}
-                className={`flex items-center gap-2 px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  isImageGenerationMode
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                <Sparkles size={14} />
-                {isImageGenerationMode ? 'Image Mode' : 'Generate Image'}
-              </button>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md border border-gray-200/80 flex items-center p-2 gap-2 relative">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                className="hidden"
-                accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.flv,.mov,.mp4,.webm,.wmv,.3gp,.aac,.flac,.mp3,.m4a,.mpga,.opus,.pcm,.wav"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                title="Attach files"
-              >
-                <Paperclip size={18} />
-              </button>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onFocus={handleInputFocus}
-                placeholder={isImageGenerationMode ? "Describe the image you want to generate..." : "Message AI Chat..."}
-                className="flex-1 min-h-[40px] max-h-40 px-3 py-2 border-none focus:outline-none bg-transparent text-base placeholder:text-gray-500 resize-none"
-                rows={1}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (input.trim() || files.length > 0) {
-                      handleStartChat(e);
-                    }
-                  }
-                }}
-              />
-              <div className="mr-2">
-                <InlineModelSelector
-                  currentProvider={selectedProvider}
-                  currentModel={selectedModel}
-                  onSelect={handleModelSelect}
-                  models={modelsForSelector}
-                />
-              </div>
-              <button
-                type="submit"
-                className={`p-2.5 rounded-lg text-white transition-all duration-200 ${input.trim() || files.length > 0 ? 'bg-gradient-to-r from-gray-900 to-gray-800 shadow-sm' : 'bg-gray-300'}`}
-                onClick={handleStartChat}
-                disabled={!input.trim() && files.length === 0}
-              >
-                <Send size={16} />
-              </button>
-            </div>
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                AI Chat can make mistakes. Consider checking important information.
-              </p>
-              <div className="text-xs text-gray-500">
-                Model: {availableModels.find(m => m.id === selectedModel)?.name || selectedModel}
-              </div>
-            </div>
-          </form>
-        </footer>
-      </main>
-
-      {/* Login modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 border border-gray-200 animate-fadeIn overflow-hidden">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">Welcome to AI Chat</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-all duration-200"
-                >
-                  <X size={15} className="text-gray-500" />
-                </button>
-              </div>
-              <p className="mb-6 text-gray-600 text-sm leading-relaxed">
-                Sign in or create an account to start chatting with our AI assistant.
+            {/* Hero section */}
+            <section className="flex-1 flex flex-col items-center justify-center px-4 py-12 md:py-16 max-w-5xl mx-auto w-full">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
+                Chat with AI Assistants
+              </h2>
+              <p className="text-lg text-gray-600 text-center mb-8 max-w-2xl">
+                Explore, create, and collaborate with multiple AI models in one place.
               </p>
               
-              <div className="flex flex-col space-y-3">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="w-full py-2.5 px-3 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-lg text-center font-medium hover:from-gray-800 hover:to-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 transition-all duration-200 shadow-sm text-sm"
-                >
-                  Sign in with Email
-                </button>
-                
-                <button
-                  onClick={() => navigate('/register')}
-                  className="w-full py-2.5 px-3 border border-gray-300 rounded-lg text-center font-medium hover:bg-gray-50 transition-all duration-200 text-gray-800 text-sm"
-                >
-                  Create an account
-                </button>
+              {/* Chat input */}
+              <div className="w-full max-w-3xl mx-auto mb-8">
+                <form onSubmit={handleStartChat} className="relative">
+                  <div className="flex items-center mb-2">
+                    <div className="flex-1 flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsImageGenerationMode(false)}
+                        className={`px-3 py-1.5 rounded-md text-sm flex items-center ${
+                          !isImageGenerationMode
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <MessageSquare size={16} className="mr-1.5" />
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsImageGenerationMode(true)}
+                        className={`px-3 py-1.5 rounded-md text-sm flex items-center ${
+                          isImageGenerationMode
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Image size={16} className="mr-1.5" />
+                        Image
+                      </button>
+                    </div>
+                    
+                    <InlineModelSelector
+                      models={modelsForSelector}
+                      currentProvider={selectedProvider}
+                      currentModel={selectedModel}
+                      onSelect={handleModelSelect}
+                    />
+                  </div>
+                  
+                  {showFilesPreview && (
+                    <div className="mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700">
+                          {files.length} {files.length === 1 ? 'file' : 'files'} attached
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearFiles}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {files.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center bg-white px-2 py-1 rounded border text-sm"
+                          >
+                            {getFileIcon(file.type)}
+                            <span className="mx-1.5 truncate max-w-[120px]">{file.name}</span>
+                            <span className="text-gray-400 text-xs mr-1">
+                              {formatFileSize(file.size)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeFile(index)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onFocus={handleInputFocus}
+                      placeholder={isImageGenerationMode ? "Describe the image you want to create..." : "Ask anything..."}
+                      className="w-full px-4 py-3 pr-24 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                    />
+                    
+                    {!isImageGenerationMode && (
+                      <div className="absolute right-16">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          multiple
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-gray-400 hover:text-gray-600"
+                          title="Attach files"
+                        >
+                          <Paperclip size={18} />
+                        </button>
+                      </div>
+                    )}
+                    
+                    <button
+                      type="submit"
+                      className="absolute right-3 p-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-700 transition-colors"
+                      title={isImageGenerationMode ? "Generate image" : "Send message"}
+                    >
+                      {isImageGenerationMode ? <Sparkles size={18} /> : <Send size={18} />}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </div>
+              
+              {/* Features */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
+                <FeatureHighlight
+                  icon={<Sparkles size={24} />}
+                  title="Multiple AI Models"
+                  description="Access GPT-4, Claude, and more - all in one place."
+                />
+                <FeatureHighlight
+                  icon={<Code size={24} />}
+                  title="Code Generation"
+                  description="Generate and explain code in various programming languages."
+                />
+                <FeatureHighlight
+                  icon={<PenSquare size={24} />}
+                  title="Content Creation"
+                  description="Create blog posts, stories, marketing copy, and more."
+                />
+                <FeatureHighlight
+                  icon={<Image size={24} />}
+                  title="Image Generation"
+                  description="Create images from text descriptions with DALL-E and Stable Diffusion."
+                />
+                <FeatureHighlight
+                  icon={<GitFork size={24} />}
+                  title="Conversation Branches"
+                  description="Explore different responses without starting over."
+                />
+                <FeatureHighlight
+                  icon={<Share2 size={24} />}
+                  title="Share Conversations"
+                  description="Collaborate by sharing conversations with others."
+                />
+              </div>
+            </section>
             
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 text-center">
-              <p className="text-xs text-gray-500">
-                By continuing, you agree to our <a href="#" className="underline">Terms of Service</a> and <a href="#" className="underline">Privacy Policy</a>.
-              </p>
+            {/* Footer */}
+            <footer className="py-6 px-6 border-t">
+              <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto">
+                <div className="mb-4 md:mb-0">
+                  <p className="text-sm text-gray-500">
+                    &copy; {new Date().getFullYear()} Echoed.Chat. All rights reserved.
+                  </p>
+                </div>
+                <div className="flex space-x-4">
+                  <a href="https://github.com" className="text-gray-500 hover:text-gray-700">
+                    <Github size={20} />
+                  </a>
+                  <a href="mailto:info@example.com" className="text-gray-500 hover:text-gray-700">
+                    <Mail size={20} />
+                  </a>
+                </div>
+              </div>
+            </footer>
+          </>
+        )}
+      </main>
+      
+      {/* Login modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">Sign in to continue</h2>
+            <p className="mb-6 text-gray-600">
+              Please sign in or create an account to start chatting with AI assistants.
+            </p>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => {
+                  handleCloseModal();
+                  navigate('/login');
+                }}
+                className="flex-1 py-2 px-4 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => {
+                  handleCloseModal();
+                  navigate('/register');
+                }}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Create account
+              </button>
+            </div>
+            <button
+              onClick={handleCloseModal}
+              className="mt-4 w-full text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Preferences prompt */}
+      {showPreferencesPrompt && user && !isCheckingPreferences && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">Set up your preferences</h2>
+            <p className="mb-6 text-gray-600">
+              To get the most out of Echoed.Chat, let's set up your AI model preferences.
+            </p>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => {
+                  setShowPreferencesPrompt(false);
+                  navigate('/model-selection');
+                }}
+                className="flex-1 py-2 px-4 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Set up now
+              </button>
+              <button
+                onClick={() => setShowPreferencesPrompt(false)}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Later
+              </button>
             </div>
           </div>
         </div>
@@ -565,5 +585,16 @@ const Home = () => {
     </div>
   );
 };
+
+// Feature highlight component
+const FeatureHighlight = ({ icon, title, description }) => (
+  <div className="bg-gray-900 p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-gray-100 rounded-full w-12 h-12 flex items-center justify-center mb-4 ">
+      {icon}
+    </div>
+    <h3 className="text-lg font-semibold mb-2 text-white">{title}</h3>
+    <p className="text-white">{description}</p>
+  </div>
+);
 
 export default Home; 

@@ -8,7 +8,7 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, loginAsGuest } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,10 +61,24 @@ const Login = () => {
       toast.error('An error occurred during login');
     }
   };
+
+  const handleGuestLogin = async () => {
+    try {
+      const result = await loginAsGuest();
+      if (result.success) {
+        navigate(from, { replace: true });
+      } else {
+        toast.error('Could not log in as guest. Please try again.');
+      }
+    } catch (error) {
+      console.error('Guest login error:', error);
+      toast.error('An error occurred during guest login.');
+    }
+  };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white shadow-lg rounded-xl overflow-hidden">
+    <div className="flex-1 flex items-center justify-center h-full py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white shadow-lg rounded-xl overflow-hidden lg:-ml-36 my-auto">
         <div className="px-8 pt-8 pb-6">
           <h1 className="text-2xl font-bold text-gray-900 text-center">
             Welcome to Echoed.Chat
@@ -188,6 +202,12 @@ const Login = () => {
                   </div>
                 </div>
                 
+                <div className="my-4 flex items-center">
+                  <div className="flex-grow border-t border-gray-300"></div>
+                  <span className="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
+                  <div className="flex-grow border-t border-gray-300"></div>
+                </div>
+
                 <div>
                   <button
                     type="submit"
@@ -198,6 +218,27 @@ const Login = () => {
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       'Sign in'
+                    )}
+                  </button>
+                </div>
+
+                <div className="my-4 flex items-center">
+                  <div className="flex-grow border-t border-gray-300"></div>
+                  <span className="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
+                  <div className="flex-grow border-t border-gray-300"></div>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleGuestLogin}
+                    className="group relative w-full flex justify-center py-2.5 px-4 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-all duration-200 shadow-sm"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      'Continue as Guest'
                     )}
                   </button>
                 </div>

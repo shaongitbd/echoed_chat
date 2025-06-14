@@ -306,8 +306,7 @@ const SharedChat = () => {
         </button>
       </div>
       
-      {/* Sidebar */}
-      <Sidebar showMobileMenu={showMobileMenu} onCloseMobileMenu={() => setShowMobileMenu(false)} />
+      
       
       {/* Main content */}
       <main className="flex-1 flex flex-col bg-white">
