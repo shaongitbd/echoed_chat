@@ -55,9 +55,9 @@ export const PROVIDERS = [
     name: 'Models provided by directly via echoed. No api key required',
     description: 'Model provided by directly via echoed. If you need vision capabilities in gemini, please use your own api key.',
     models: [
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (No vision)', description: ' State of the art AI model from google.Often seen as most well rounded model currenly avilable.', capabilities: [
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro ', description: ' State of the art AI model from google.Often seen as most well rounded model currenly avilable.', capabilities: [
         'text'], vision:false },
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (No vision)', description: 'Cut Down version of Gemini 2.5 Pro. It is faster and cheaper but less powerful than Gemini 2.5 Pro.', capabilities: ['text'] , vision:false},
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash ', description: 'Cut Down version of Gemini 2.5 Pro. It is faster and cheaper but less powerful than Gemini 2.5 Pro.', capabilities: ['text'] , vision:false},
       { id: 'imgen', name: 'Imgen 4/3', description: 'State of the artImage generation model From google. Depending on usages we will select either Imgen 4 or Imgen 3.', capabilities: ['image'] , vision:false,},
       { id: 'deepseek-ai/DeepSeek-R1', name: 'DeepSeek R1 0528', description: 'open-source large language model specializing in complex reasoning, mathematics, and programming task', capabilities: ['text'] , vision:false},
       { id: 'deepseek-ai/DeepSeek-V3-0324', name: 'DeepSeek V3 0324', description: 'improved version of DeepSeek-V3 that shows enhanced performance in reasoning, coding, Chinese writing, and function calling', capabilities: ['text'] },
