@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail, Paperclip, FileText, Music, Film, GitFork, Share2, ArrowRightLeft, Lock } from 'lucide-react';
+import { Settings, Menu, X, Send, Sparkles, Code, PenSquare, Image, MessageSquare, Github, Mail, Paperclip, FileText, Music, Film, GitFork, Share2, ArrowRightLeft, Lock, DatabaseBackup } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { appwriteService } from '../lib/appwrite';
@@ -464,27 +464,29 @@ const Home = () => {
                 <FeatureHighlight
                   icon={<Sparkles size={24} />}
                   title="Multiple AI Models"
-                  description="Access GPT-4, Claude, and more - all in one place."
-                />
-                <FeatureHighlight
-                  icon={<Code size={24} />}
-                  title="Code Generation"
-                  description="Generate and explain code in various programming languages."
-                />
-                <FeatureHighlight
-                  icon={<PenSquare size={24} />}
-                  title="Content Creation"
-                  description="Create blog posts, stories, marketing copy, and more."
+                  description="Access Gemini 2.5 pro, GPT-4, Claude, and more - all in one place."
                 />
                 <FeatureHighlight
                   icon={<Image size={24} />}
                   title="Image Generation"
-                  description="Create images from text descriptions with DALL-E and Stable Diffusion."
+                  description="Create images from text descriptions with Imagen 3 and 4."
                 />
+                <FeatureHighlight
+                  icon={<DatabaseBackup size={24} />}
+                  title="Authentication & DB Sync"
+                  description="Secure user authentication and real-time database synchronization with Appwrite."
+                />
+              
+              
                 <FeatureHighlight
                   icon={<GitFork size={24} />}
                   title="Conversation Branches"
                   description="Explore different responses without starting over."
+                />
+                  <FeatureHighlight
+                  icon={<PenSquare size={24} />}
+                  title="Chat Export/Imports"
+                  description="Easily export and import your chat history."
                 />
                 <FeatureHighlight
                   icon={<Share2 size={24} />}
