@@ -20,9 +20,7 @@ export const handleCreateUserProfile = async (req, res) => {
     
   
     
-    if (!name || !email) {
-      return res.status(400).json({ error: 'Missing required fields: name or email' });
-    }
+
     
     const userProfile = await createUserProfile(userId, name, email);
     
